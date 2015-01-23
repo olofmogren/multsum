@@ -1,0 +1,122 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+
+import subsum, re, os, codecs, nltk
+from pymongo import MongoClient
+from datetime import datetime,timedelta
+
+SENTENCE_SPLIT_REGEX = r' *[\.\?!][\'"\)\]]* *'
+
+mongo_conn = MongoClient("localhost")
+mongo_db = mongo_conn.db_wordcount
+
+#time_to = datetime.now()
+time_from = datetime.now()-timedelta(days=1)
+
+tokenizer = nltk.data.load('nltk:tokenizers/punkt/swedish.pickle')
+
+db_ids = dict()
+
+output_file = codecs.open("/home/mogren/btsync/NewsSummaries/news_summary_"+datetime.now()+".html", "w", "utf-8")
+
+docs = mongo_db.news_documents.find({"publication_datetime": {"$gte": time_from}, 'source_uri': {'$regex': 'nyheter'}})
+titlesLists = list()
+for doc in docs:
+  #print('.'),
+  l = list()
+  l.append(doc["document_title"])
+  db_ids[doc["document_title"]] = doc["_id"]
+  titlesLists.append(l)
+
+print(str(len(titlesLists))+" titles to cluster"),
+print("clustering... ("+str(len(titlesLists))+" titles to cluster)"),
+if len(titlesLists) == 0:
+  exit()
+clustering = subsum.get_clustering(titlesLists)
+print("done")
+
+inverse_clustering = list()
+for i in range(0,max(clustering)+1):
+  inverse_clustering.append(set())
+for i in range(0,len(clustering)):
+  cluster_index = clustering[i]
+  #print(cluster_index),
+  #print(len(inverse_clustering))
+  s = inverse_clustering[cluster_index]
+  s.add(i)
+  inverse_clustering[clustering[i]] = s
+
+#print(inverse_clustering)
+
+for i in range(0,len(inverse_clustering)):
+  print("***CLUSTER*** "+str(i))
+  clusterSet = inverse_clustering[i]
+  sentencesLists = list()
+  clusterTitlesLists = list()
+  urls = list()
+  images = list()
+  for ti in clusterSet:
+    print("title index "+str(ti))
+    title = titlesLists[ti][0] #there are only one title/sentence in each list.
+    print("DB: title: "+title)
+    docs = mongo_db.news_documents.find({"_id": db_ids[title]})
+    print("Done with DB.")
+    for doc in docs:
+      #print('.'),
+      content = ""
+      if 'document_title' in doc:
+        content += doc['document_title']
+      if 'document_preamble' in doc:
+        content += " "+doc['document_preamble']
+      if 'document_body' in doc:
+        content += " "+doc['document_body']
+      content.replace('\n', ' ')
+      #sentencesLists.append(re.split(SENTENCE_SPLIT_REGEX, content))
+      sentencesLists.append(tokenizer.tokenize(content))
+      titleList = list()
+      titleList.append(doc['document_title'])
+      clusterTitlesLists.append(titleList)
+      urls.append(doc['source_uri'])
+      if 'image' in doc:
+        images.append(doc['image'])
+
+  print("Done with DB for this cluster. Will summarize.")
+  documents = len(sentencesLists)
+  sentences = 0
+  for doc in sentencesLists:
+    sentences += len(doc)
+  print(str(documents)+' documents. '+str(sentences)+' sentences.')
+
+  
+  stopwords_file =  os.path.dirname(os.path.realpath(__file__))+"/swedish_stopwords.txt"
+  print("stopwords_file: "+stopwords_file)
+
+  print("(Summarized) TITLE:")
+  summed_title = clusterTitlesLists[0][0]
+  if len(clusterTitlesLists) > 1:
+    summed_title = subsum.summarize_strings(clusterTitlesLists, stopwords_file, 1, subsum.UNIT_SENTENCES)
+  output_file.write(u"<h1>")
+  output_file.write(summed_title)#.encode('utf-8'))
+  output_file.write(u"</h1>\n\n");
+  print("300 word summary of news article cluster: ")
+  news_summary = subsum.summarize_strings(sentencesLists, stopwords_file, 300, subsum.UNIT_WORDS)
+  output_file.write("<p>\n");
+  output_file.write(u"Summary from "+str(len(urls))+" different source articles.")#.encode('utf-8'));
+  output_file.write("</p>\n\n");
+  output_file.write("<p>\n");
+  output_file.write(news_summary)#.encode('utf-8'));
+  output_file.write("</p>\n\n");
+  print("Summary was made from the following articles: ")
+  output_file.write(u"<p>Web pages:\n");
+  for u in urls:
+    output_file.write(u+u"\n");
+    print(u)
+  output_file.write(u"</p><p>Images:\n");
+  for u in images:
+    output_file.write(u"<img src=\""+u+u"\" />\n");
+    print(u)
+  output_file.write(u"</p>\n\n\n");
+
+  print("Done summarizing.")
+
+output_file.close()
