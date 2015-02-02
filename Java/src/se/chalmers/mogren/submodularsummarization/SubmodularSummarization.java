@@ -54,6 +54,7 @@ public abstract class SubmodularSummarization
     MOD_STRICT_LENGTH,
     OPTION_SAVE_MATRICES,
     MOD_WEIGHTED_AVERAGE,
+    MOD_NSMKL_CLUSTERING,
     MOD_R1SUPER,
     MOD_MATRIX_MAX,
     MOD_MATRIX_MIN,

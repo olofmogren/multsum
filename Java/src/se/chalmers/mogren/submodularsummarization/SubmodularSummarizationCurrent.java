@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
+import se.chalmers.mogren.mklsum.NSMKLSum;
 import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
 
 /**
@@ -48,7 +49,7 @@ import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public class SubmodularSummarization2 extends SubmodularSummarization
+public class SubmodularSummarizationCurrent extends SubmodularSummarization
 {
   private static final String USAGE_STRING = "Usage: <command> --matrix-file <filename1> [--matrix-file <filename2> [--matrix-file <filename3> [...]]] \n" +
       "--document-file file-or-directory \n" +
@@ -77,7 +78,7 @@ public class SubmodularSummarization2 extends SubmodularSummarization
 
   public static void main(String[] args)
   {
-    SubmodularSummarization2 summary = null;
+    SubmodularSummarizationCurrent summary = null;
     double lambda = DEFAULT_LAMBDA;
     int summarySize = 2;
     LengthUnit summarySizeUnit = LengthUnit.SENTENCES;
@@ -194,11 +195,11 @@ public class SubmodularSummarization2 extends SubmodularSummarization
         System.err.println("WARNING! sentences list is null!");
 
       HashMap<String, Double> nullIdfs = null;
-      summary = new SubmodularSummarization2(matrixFileNames, null, sentences, null, null, null, lambda, summarySize, summarySizeUnit, flags, nullIdfs, null);
+      summary = new SubmodularSummarizationCurrent(matrixFileNames, null, sentences, null, null, null, lambda, summarySize, summarySizeUnit, flags, nullIdfs, null);
     }
     else
     {
-      summary = new SubmodularSummarization2(null, null, null, stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, summarySizeUnit, flags, idfs, null);
+      summary = new SubmodularSummarizationCurrent(null, null, null, stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, summarySizeUnit, flags, idfs, null);
     }
 
     if(printAsText)
@@ -207,7 +208,7 @@ public class SubmodularSummarization2 extends SubmodularSummarization
     System.out.println(summary);
 
   }
-  public SubmodularSummarization2(List<String> matrixFileNames,
+  public SubmodularSummarizationCurrent(List<String> matrixFileNames,
       String weightFile,
       List<String> sentences,
       String stopwordsFilename,
@@ -278,7 +279,7 @@ public class SubmodularSummarization2 extends SubmodularSummarization
    *                            getIdfsFromDocCollection(sentencesLists, stopwordsFilename, wordClusterFileName)
    *
    */
-  public SubmodularSummarization2(List<String> matrixFileNames,
+  public SubmodularSummarizationCurrent(List<String> matrixFileNames,
       String matrixWeightFile,
       List<String> sentences,
       String stopwordsFilename,
@@ -534,6 +535,13 @@ public class SubmodularSummarization2 extends SubmodularSummarization
     int K = getK(matrices[0].distances.length);
 
     LinkedList<int[]> clusterings = new LinkedList<int[]>();
+    if(flags.contains(Flags.MOD_NSMKL_CLUSTERING))
+    {
+      ArrayList<double[][]> simMatrices = new ArrayList<double[][]>();
+      for(DocMatrices dms: matrices)
+        simMatrices.add(dms.similarities);
+      clusterings.add(NSMKLSum.clusterMatrices(simMatrices));
+    }
     if(sentenceVectorsForClustering != null)
     {
       System.out.println("Clustering specified sentence vectors!");
