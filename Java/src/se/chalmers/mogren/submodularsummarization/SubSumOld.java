@@ -16,7 +16,7 @@ import java.util.TreeSet;
 
 import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
 
-public class SubmodularSummarizationOld extends SubmodularSummarization
+public class SubSumOld extends SubSumBase
 {
   private static final String USAGE_STRING = "Usage: <command> --matrix-file <filename1> [--matrix-file <filename2> [--matrix-file <filename3> [...]]] \n" +
       "--document-file file \n" +
@@ -41,7 +41,7 @@ public class SubmodularSummarizationOld extends SubmodularSummarization
 
   public static void main(String[] args)
   {
-    SubmodularSummarizationOld summary = null;
+    SubSumOld summary = null;
     double lambda = DEFAULT_LAMBDA;
     int summarySize = 2;
     LengthUnit lengthUnit = LengthUnit.SENTENCES;
@@ -113,16 +113,16 @@ public class SubmodularSummarizationOld extends SubmodularSummarization
       if(sentences == null)
         System.err.println("WARNING! sentences list is null!");
 
-      summary = new SubmodularSummarizationOld(matrixFileNames.toArray(new String[matrixFileNames.size()]), sentences, lambda, summarySize, lengthUnit, new HashSet<Flags>());
+      summary = new SubSumOld(matrixFileNames.toArray(new String[matrixFileNames.size()]), sentences, lambda, summarySize, lengthUnit, new HashSet<Flags>());
     }
     else
     {
-      summary = new SubmodularSummarizationOld(stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, lengthUnit, new HashSet<Flags>());
+      summary = new SubSumOld(stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, lengthUnit, new HashSet<Flags>());
     }
 
     System.out.println(summary);
   }
-  public SubmodularSummarizationOld(String stopwordsFilename, String documentFileName, String wordClusterFileName, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
+  public SubSumOld(String stopwordsFilename, String documentFileName, String wordClusterFileName, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
   {
     if(lambda == null)
       lambda = DEFAULT_LAMBDA;
@@ -148,7 +148,7 @@ public class SubmodularSummarizationOld extends SubmodularSummarization
     selectSentences(summarySize, sentenceMeasures.similarities, lambda, clusterings, K, sentences, lengthUnit, flags);
   }
 
-  public SubmodularSummarizationOld(String[] matrixFileNames, ArrayList<String> sentences, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
+  public SubSumOld(String[] matrixFileNames, ArrayList<String> sentences, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
   {
     if(lambda == null)
       lambda = DEFAULT_LAMBDA;

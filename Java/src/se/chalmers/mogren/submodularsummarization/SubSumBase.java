@@ -46,7 +46,7 @@ import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public abstract class SubmodularSummarization
+public abstract class SubSumBase
 {
   public enum Flags {MOD_COST_WEIGHT,
     MOD_SINGLETON,
@@ -55,6 +55,7 @@ public abstract class SubmodularSummarization
     OPTION_SAVE_MATRICES,
     MOD_WEIGHTED_AVERAGE,
     MOD_NSMKL_CLUSTERING,
+    MOD_PRUNE,
     MOD_R1SUPER,
     MOD_MATRIX_MAX,
     MOD_MATRIX_MIN,
@@ -62,7 +63,8 @@ public abstract class SubmodularSummarization
     MOD_MATRIX_L2,
     MOD_MATRIX_L3,
     MOD_MATRIX_L4,
-    MOD_MATRIX_L100
+    MOD_MATRIX_L100,
+    MOD_PRONOUNS
   };
 
   public enum LengthUnit {SENTENCES, WORDS, CHARACTERS};

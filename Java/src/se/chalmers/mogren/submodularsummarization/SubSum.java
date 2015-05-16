@@ -10,11 +10,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 import java.util.TreeSet;
 
 import se.chalmers.mogren.mklsum.NSMKLSum;
@@ -49,7 +51,7 @@ import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public class SubmodularSummarizationCurrent extends SubmodularSummarization
+public class SubSum extends SubSumBase
 {
   private static final String USAGE_STRING = "Usage: <command> --matrix-file <filename1> [--matrix-file <filename2> [--matrix-file <filename3> [...]]] \n" +
       "--document-file file-or-directory \n" +
@@ -61,9 +63,9 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
       "[--nb-characters summarysize] \n" +
       "[--lambda lambda] \n" +
       "[--disable-bigrams] \n" +
-      "[--print-as-text] \n" +
-      "[--flag MOD_COST_WEIGHT|MOD_SINGLETON|MOD_STRICT_LENGTH ] \n" +
-      "(Either at least one matrix file or a document file must be present.)\n" +
+      "[--print-as-text] \n";
+
+  private static final String EXPLANATION_STRING = "(Either at least one matrix file or a document file must be present.)\n" +
       "(If document file is a directory, I will try to summarize all documents within.)\n";
 
 
@@ -71,14 +73,25 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
   private static final double A                    = 5.0;
   //  private static final double ALPHA                = 0.75f; //LIn-bilmes: alpha = a/N
   private static final double DEFAULT_LAMBDA       = 6.0;
+  private static final double LINBILMES_CONSTANT_R = 0.3;
+  
+  private static final String[] FORBIDDEN_PRONOUNS = {"he", "she", "they"};
 
-  private static final double LINBILMES_CONSTANT_R = 0.3f;
+  private static final double DISCONNECT_FRACTION = 0.4;
+
   LinkedList<Integer> selectedList;
-
 
   public static void main(String[] args)
   {
-    SubmodularSummarizationCurrent summary = null;
+
+    String flagString = 
+        "[--flag ";
+    for(SubSum.Flags flag: SubSum.Flags.values())
+      flagString += flag.toString()+"|";
+    flagString = flagString.substring(0, flagString.length()-1);
+    flagString += " ] \n";
+
+    SubSum summary = null;
     double lambda = DEFAULT_LAMBDA;
     int summarySize = 2;
     LengthUnit summarySizeUnit = LengthUnit.SENTENCES;
@@ -95,7 +108,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
 
     if (args.length <= 0)
     {
-      System.out.println(USAGE_STRING);
+      System.out.println(USAGE_STRING+flagString+EXPLANATION_STRING);
       System.exit(1);
     }
 
@@ -195,11 +208,11 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
         System.err.println("WARNING! sentences list is null!");
 
       HashMap<String, Double> nullIdfs = null;
-      summary = new SubmodularSummarizationCurrent(matrixFileNames, null, sentences, null, null, null, lambda, summarySize, summarySizeUnit, flags, nullIdfs, null);
+      summary = new SubSum(matrixFileNames, null, sentences, null, null, null, lambda, summarySize, summarySizeUnit, flags, nullIdfs, null);
     }
     else
     {
-      summary = new SubmodularSummarizationCurrent(null, null, null, stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, summarySizeUnit, flags, idfs, null);
+      summary = new SubSum(null, null, null, stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, summarySizeUnit, flags, idfs, null);
     }
 
     if(printAsText)
@@ -208,7 +221,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
     System.out.println(summary);
 
   }
-  public SubmodularSummarizationCurrent(List<String> matrixFileNames,
+  public SubSum(List<String> matrixFileNames,
       String weightFile,
       List<String> sentences,
       String stopwordsFilename,
@@ -279,7 +292,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
    *                            getIdfsFromDocCollection(sentencesLists, stopwordsFilename, wordClusterFileName)
    *
    */
-  public SubmodularSummarizationCurrent(List<String> matrixFileNames,
+  public SubSum(List<String> matrixFileNames,
       String matrixWeightFile,
       List<String> sentences,
       String stopwordsFilename,
@@ -522,7 +535,29 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
     return new DocMatrices(sentenceTFIDFCosineSim, sentenceDissimilarities, sentenceIDFVectors);
   }
 
-
+  private HashSet<Integer> getDisconnected(double[][] m)
+  {
+    TreeMap<Double, Integer> ts = new TreeMap<Double, Integer>(); 
+    HashSet<Integer> s = new HashSet<Integer>();
+    for(int i = 0; i < m.length; i++)
+    {
+      double weightedDegree = 0.0;
+      for(int j = 0; j < m[i].length; j++)
+      {
+        weightedDegree += m[i][j];
+      }
+      ts.put(weightedDegree, i);
+    }
+    int k = 0;
+    for(Double d: ts.keySet())
+    {
+      if(k >= m.length*DISCONNECT_FRACTION)
+        break;
+      s.add(ts.get(d));
+      k++;
+    }
+    return s;
+  }
 
 
   private void selectSentences(int summarySize, DocMatrices[] matrices, double lambda, List<String> sentences, LengthUnit lengthUnit, Collection<Flags> flags, double[] weights, double[][] sentenceVectorsForClustering, String idfVectorFileName, String docName)
@@ -530,7 +565,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
     HashSet<Integer> discarded = new HashSet<Integer>();
     HashSet<Integer> selected = new HashSet<Integer>();
     selectedList = new LinkedList<Integer>();
-    DocMatrices avgMx = getAggregateMatrix(matrices, weights, selected.size(), flags);
+    DocMatrices aggMx = getAggregateMatrix(matrices, weights, selected.size(), flags);
 
     int K = getK(matrices[0].distances.length);
 
@@ -544,31 +579,55 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
     }
     if(sentenceVectorsForClustering != null)
     {
-      System.out.println("Clustering specified sentence vectors!");
+      System.out.println(new Date()+": Clustering specified sentence vectors!");
       clusterings.add(getClusteringByVectors(sentenceVectorsForClustering, K, idfVectorFileName, docName));
     }
     else if(matrices[0].sentenceVectors != null)
     {
-      System.out.println("Clustering sentence vectors!");
+      System.out.println(new Date()+": Clustering sentence vectors!");
       clusterings.add(getClusteringByVectors(matrices[0].sentenceVectors, K, idfVectorFileName, docName));
     }
     else if(flags.contains(Flags.MOD_R1SUPER))
     {
-      System.out.println("Clustering MOD_R1SUPER!");
+      System.out.println(new Date()+": Clustering MOD_R1SUPER!");
       for(DocMatrices mp: matrices)
         clusterings.add(getClustering(mp, K));
     }
     else
     {
-      System.out.println("Clustering average!");
+      System.out.println(new Date()+": Clustering average!");
       clusterings.add(getClustering(getAggregateMatrix(matrices, weights, selected.size(), flags), K));
+    }
+
+    HashSet<Integer> pruned = new HashSet<Integer>();
+    HashSet<Integer> pronounSentences = getPronounSentences(sentences);
+    if(flags.contains(Flags.MOD_PRUNE))
+    {
+      pruned = getDisconnected(aggMx.similarities);
+      System.out.println(new Date()+": Pruning "+pruned.size()+" sentences due to low connectivity (MOD_PRUNE).");
+    }
+    if(flags.contains(Flags.MOD_PRONOUNS))
+    {
+      System.out.println(new Date()+": Pruning "+pronounSentences.size()+" sentences due to pronouns.");
+      pruned.addAll(pronounSentences);
     }
 
     while(summaryIsTooShort(selected, sentences, lengthUnit, summarySize))
     {
       if(weights != null)
       {
-        avgMx = getAggregateMatrix(matrices, weights, selected.size(), flags);
+        aggMx = getAggregateMatrix(matrices, weights, selected.size(), flags);
+
+        if(flags.contains(Flags.MOD_PRUNE))
+        {
+          pruned = getDisconnected(aggMx.similarities);
+          System.out.println(new Date()+": Pruning "+pruned.size()+" sentences due to low connectivity (MOD_PRUNE).");
+        }
+        if(flags.contains(Flags.MOD_PRONOUNS))
+        {
+          System.out.println(new Date()+": Pruning "+pronounSentences.size()+" sentences due to pronouns. (MOD_PRONOUNS)");
+          pruned.addAll(pronounSentences);
+        }
 
         if(sentenceVectorsForClustering != null || matrices[0].sentenceVectors != null || flags.contains(Flags.MOD_R1SUPER))
         {
@@ -577,8 +636,8 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
         else
         {
           clusterings = new LinkedList<int[]>();
-          System.out.println("Clustering average!");
-          clusterings.add(getClustering(avgMx, K));
+          System.out.println(new Date()+": Clustering average!");
+          clusterings.add(getClustering(aggMx, K));
         }
       }
       //Integer secondBest = -1, thirdBest = -1;
@@ -586,25 +645,26 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
 
       double max = 0.0;
       Integer argmax = null;
-      for (int i = 0; i < avgMx.similarities.length; ++i)
+      for (int i = 0; i < aggMx.similarities.length; ++i)
       {
-        if(!selected.contains(i) && !discarded.contains(i))
+        if(selected.contains(i) || discarded.contains(i) || pruned.contains(i) )
         {
-          selected.add(i);
-          double curr = L1 (selected, avgMx.similarities, null, A) + lambda * R1Super(selected, avgMx.similarities, clusterings, K);
-          /* as in Lin-Bilmes 2010: */
-          if((lengthUnit == LengthUnit.CHARACTERS || lengthUnit == LengthUnit.WORDS) && (flags.contains(Flags.MOD_COST_WEIGHT)))
-            curr /= Math.pow(sentences.get(i).length(),LINBILMES_CONSTANT_R);
-          if (curr > max)
-          {
-            //thirdBest = secondBest; if(argmax != null) secondBest = argmax;
-            //thirdBestScore = secondBestScore; secondBestScore = max;
-
-            argmax = i;
-            max = curr;
-          }
-          selected.remove(i);
+          continue;
         }
+        selected.add(i);
+        double curr = L1 (selected, aggMx.similarities, null, A) + lambda * R1Super(selected, aggMx.similarities, clusterings, K);
+        /* as in Lin-Bilmes 2010: */
+        if((lengthUnit == LengthUnit.CHARACTERS || lengthUnit == LengthUnit.WORDS) && (flags.contains(Flags.MOD_COST_WEIGHT)))
+          curr /= Math.pow(sentences.get(i).length(),LINBILMES_CONSTANT_R);
+        if (curr > max)
+        {
+          //thirdBest = secondBest; if(argmax != null) secondBest = argmax;
+          //thirdBestScore = secondBestScore; secondBestScore = max;
+
+          argmax = i;
+          max = curr;
+        }
+        selected.remove(i);
       }
 
       if (argmax != null)
@@ -637,7 +697,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
     {
       if(weights != null)
       {
-        avgMx = getAggregateMatrix(matrices, weights, 0, flags);
+        aggMx = getAggregateMatrix(matrices, weights, 0, flags);
 
         if(sentenceVectorsForClustering != null || matrices[0].sentenceVectors != null || flags.contains(Flags.MOD_R1SUPER))
         {
@@ -646,19 +706,19 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
         else
         {
           clusterings = new LinkedList<int[]>();
-          System.out.println("Clustering average!");
-          clusterings.add(getClustering(avgMx, K));
+          System.out.println(new Date()+": Clustering average!");
+          clusterings.add(getClustering(aggMx, K));
         }
       }
-      double currentlyBestCScore = L1(selected, avgMx.similarities, null, A) + lambda * R1Super(selected, avgMx.similarities, clusterings, K);
+      double currentlyBestCScore = L1(selected, aggMx.similarities, null, A) + lambda * R1Super(selected, aggMx.similarities, clusterings, K);
       Integer currentlyBestSingleton = null;
-      for(int i = 0; i < avgMx.similarities.length; i++)
+      for(int i = 0; i < aggMx.similarities.length; i++)
       {
         HashSet<Integer> singleton = new HashSet<Integer>();
         singleton.add(i);
         if(!summaryIsTooLong(singleton, sentences, lengthUnit, summarySize))
         {
-          double singletonSummaryScore = L1(singleton, avgMx.similarities, null, A) + lambda * R1Super(singleton, avgMx.similarities, clusterings, K);
+          double singletonSummaryScore = L1(singleton, aggMx.similarities, null, A) + lambda * R1Super(singleton, aggMx.similarities, clusterings, K);
           if(singletonSummaryScore > currentlyBestCScore)
           {
             currentlyBestCScore = singletonSummaryScore;
@@ -674,6 +734,29 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
     }
   }
 
+  private HashSet<Integer> getPronounSentences(List<String> sentences)
+  {
+    HashSet<Integer> set = new HashSet<Integer>();
+    sentenceLoop:
+      for(int i=0; i < sentences.size(); i++)
+      {
+        String sentence = sentences.get(i);
+        String[] words = sentence.split(REGEX_SPACE);
+        for(String word: words)
+        {
+          word = word.toLowerCase();
+          for(String pronoun: FORBIDDEN_PRONOUNS)
+          {
+            if(word.equals(pronoun))
+            {
+              set.add(i);
+              continue sentenceLoop;
+            }
+          }
+        }
+      }
+    return set;
+  }
   private DocMatrices getAggregateMatrix(DocMatrices[] ms, double[] weights, int weightOffset, Collection<Flags> flags)
   {
     if(flags.contains(Flags.MOD_MATRIX_MULT))
@@ -781,7 +864,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
    */
   public static HashMap<String, Double> getIdfsDocCorpus(String corpusPath, String stopwordsFilename, String wordClusterFilename)
   {
-    System.out.println("Calculating IDFS.");
+    System.out.println(new Date()+": Calculating IDFS.");
 
     List<List<String>> corpus = new ArrayList<List<String>>();
 
@@ -801,7 +884,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
       }
       catch (IOException e)
       {
-        System.err.println("Failed to open or read sentence files for IDF computations.");
+        System.err.println(new Date()+": Failed to open or read sentence files for IDF computations.");
         e.printStackTrace();
         System.exit(-1);
       }
@@ -910,7 +993,7 @@ public class SubmodularSummarizationCurrent extends SubmodularSummarization
       double idf = Math.log10(((double)documentCluster.size())/documentCountsForTerm.get(term).doubleValue());
       idfs.put(term, idf);
     }
-    System.out.println("Done calculating IDFS.");
+    System.out.println(new Date()+": Done calculating IDFS.");
 
     return idfs;
   }

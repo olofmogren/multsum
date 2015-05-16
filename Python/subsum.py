@@ -43,7 +43,7 @@ REGEX_SPACE         = "\\W+"
 REGEX_SPACE_COMMA   = "\\s+|,"
 REGEX_NONWORD       = "[^\\p{L}\\p{Nd}]+"
 
-DEFAULT_STOPWORDS = '/home/mogren/btsync/code/others_code/ROUGE/RELEASE-1.5.5/data/smart_common_words.txt'
+DEFAULT_STOPWORDS = '/home/mogren/Syncthing/Code/others_code/ROUGE/RELEASE-1.5.5/data/smart_common_words.txt'
 
 def L1(S, w, alpha, a):
   if not alpha:
@@ -301,7 +301,10 @@ def select_sentences(summarySize,
   aggMatrix = getMultipliedAggregateSimilarities(matrices)
 
   K = getK(count_sentences(sentencesLists))
-  clustering = getClusteringByVectors(sentenceVectors, K, idfVectorFileName, docName)
+  if sentenceVectors:
+    clustering = getClusteringByVectors(sentenceVectors, K, idfVectorFileName, docName)
+  else:
+   clustering = get_clustering(sentencesLists, DEFAULT_STOPWORDS)
 
   while summaryIsTooShort(selected, sentencesLists, lengthUnit, summarySize):
     max_val = 0.0
@@ -406,6 +409,53 @@ def getIdfsFromDocCollection(documentCluster, stopwordsFilename):
 
   return idfs
 
+def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_STOPWORDS, length=300, unit=UNIT_WORDS):
+  matrices = list()
+
+  for filename in matrix_files:
+    values = []
+    f = open(filename, 'r')
+    for line in f:
+      if line:
+        row = []
+        for val in line.strip().strip(';').split(','):
+          #print val
+          row.append(float(val))
+        #print 'new line!'
+        values.append(row)
+
+  
+    matrix = numpy.zeros((len(values),len(values)))
+    for i in range(0, len(values)):
+      for j in range(0, len(values)):
+        matrix[i][j] = values[i][j]
+    
+    matrices.append(matrix)
+
+  sentencesLists = list()
+  print sentence_file
+  f = open(sentence_file, 'r')
+  sentences = list()
+  for line in f:
+    if line:
+      sentences.append(line)
+  sentencesLists.append(sentences)
+
+  summary_set = select_sentences(length,
+                     matrices,
+                     None,
+                     sentencesLists,
+                     unit,
+                     None,
+                     'summarization_doc')
+  summary_list = list(summary_set)
+  summary_list.sort()
+  return_string = ''
+  for i in summary_list:
+    return_string += get_sentence_index(i, sentencesLists)+'\n'
+    print(get_sentence_index(i, sentencesLists))
+  return return_string
+ 
 
 def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=300, unit=UNIT_WORDS):
   sentsims = get_def_sentsims(sentencesLists, stopwords, None)
@@ -439,7 +489,7 @@ def summarize_files(document_names, length=300, unit=UNIT_WORDS):
         sentences.append(line)
     sentencesLists.append(sentences)
 
-  return summarize_strings(sentencesLists, length, unit)
+  return summarize_strings(sentencesLists, length=length, unit=unit)
 
 def get_clustering(sentencesLists, stopwords=DEFAULT_STOPWORDS):
   sentsims = get_def_sentsims(sentencesLists, stopwords, None)
@@ -449,10 +499,28 @@ def get_clustering(sentencesLists, stopwords=DEFAULT_STOPWORDS):
 
 
 def main():
-  l = list()
+  doc_files = True
+  files = list()
+  sentences_file = None
+  skip = False
   for i in range(1,len(sys.argv)):
-    l.append(sys.argv[i])
-  summarize_files(l)
+    if skip:
+      skip = False
+      continue
+
+    if sys.argv[i] == '--m':
+      # matrix files
+      doc_files = False
+    elif sys.argv[i] == '--s':
+      # matrix files
+      sentences_file = sys.argv[i+1]
+      skip = True
+    else:
+      files.append(sys.argv[i])
+  if doc_files:
+    summarize_files(files)
+  else:
+    summarize_matrix_files(files, sentences_file)
 
 if  __name__ =='__main__':main()
 

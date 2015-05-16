@@ -29,10 +29,10 @@ from subprocess import call
  # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/btsync/code/others_code/cluto/scluster"
-CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/btsync/code/others_code/cluto/vcluster"
+CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/scluster"
+CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/vcluster"
 
-DEFAULT_STOPWORDS = '/home/mogren/btsync/code/others_code/ROUGE/RELEASE-1.5.5/data/smart_common_words.txt'
+DEFAULT_STOPWORDS = '/home/mogren/Syncthing/Code/others_code/ROUGE/RELEASE-1.5.5/data/smart_common_words.txt'
 
 DEFAULT_VECTORS_FILE_PREFIX = '/tmp/submod_py_vectors.'
 
