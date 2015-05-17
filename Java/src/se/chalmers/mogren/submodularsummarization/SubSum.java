@@ -55,9 +55,9 @@ public class SubSum extends SubSumBase
 {
   private static final String USAGE_STRING = "Usage: <command> --matrix-file <filename1> [--matrix-file <filename2> [--matrix-file <filename3> [...]]] \n" +
       "--document-file file-or-directory \n" +
-      "--collection-for-idfs directory \n" +
+      "[--collection-for-idfs directory \n]" +
       "--stopwords-file filename \n" +
-      "--word-clusters-file filename \n" +
+      "[--word-clusters-file filename \n]" +
       "[--nb-sentences summarysize] \n" +
       "[--nb-words summarysize] \n" +
       "[--nb-characters summarysize] \n" +
