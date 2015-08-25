@@ -4,6 +4,7 @@
 import math, numpy, os.path, re, sys,time
 from stemming.porter2 import stem
 from multsum_clustering import *
+from analyze_sentiment import analyze_sentiment
 
  # @author Olof Mogren
  #
@@ -39,11 +40,19 @@ UNIT_WORDS           = 1
 UNIT_SENTENCES       = 2
 UNIT_CHARACTERS      = 3
 
+LENGTH_UNITS = dict()
+LENGTH_UNITS['WORDS'] = UNIT_WORDS
+LENGTH_UNITS['SENTENCES'] = UNIT_SENTENCES
+LENGTH_UNITS['CHARACTERS'] = UNIT_CHARACTERS
+
+DEFAULT_SUMMARY_LENGTH = 300
+
 REGEX_SPACE         = "\\W+"
 REGEX_SPACE_COMMA   = "\\s+|,"
 REGEX_NONWORD       = "[^\\p{L}\\p{Nd}]+"
 
-DEFAULT_STOPWORDS = '/home/mogren/Syncthing/Code/others_code/ROUGE/RELEASE-1.5.5/data/smart_common_words.txt'
+DEFAULT_STOPWORDS   = 'english_stopwords.txt'
+W2V_VECTOR_FILE     = '/home/mogren/Downloads/GoogleNews-vectors-negative300.bin'
 
 def L1(S, w, alpha, a):
   if not alpha:
@@ -93,9 +102,10 @@ def getMultipliedAggregateSimilarities(ms):
   if len(ms) == 1:
     return ms[0]
 
-  aggregateSim = zeros((ms.shape[0],ms.shape[1]))
+  aggregateSim = ms[0]
 
-  for m in ms:
+  for k in range(1,len(ms)):#skip first, it's already added above.
+    m = ms[k]
     for i in range(0, m.shape[0]):
       for j in range(0, m.shape[1]):
         aggregateSim[i][j] *= m[i][j]
@@ -300,11 +310,20 @@ def select_sentences(summarySize,
   selected = set()
   aggMatrix = getMultipliedAggregateSimilarities(matrices)
 
+  #for i in range(0,aggMatrix.shape[0]):
+  #  for j in range(0,aggMatrix.shape[1]):
+  #    print str(aggMatrix[i][j])+' ',
+  #  print 'EOL'
+
   K = getK(count_sentences(sentencesLists))
   if not sentenceVectors is None:
     clustering = getClusteringByVectors(sentenceVectors, K, idfVectorFileName, docName)
   else:
-   clustering = get_clustering(sentencesLists, DEFAULT_STOPWORDS)
+    clustering = get_clustering(sentencesLists, DEFAULT_STOPWORDS)
+
+  #print 'clustering:'
+  #for i in clustering:
+  #  print i
 
   while summaryIsTooShort(selected, sentencesLists, lengthUnit, summarySize):
     max_val = 0.0
@@ -409,7 +428,7 @@ def getIdfsFromDocCollection(documentCluster, stopwordsFilename):
 
   return idfs
 
-def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_STOPWORDS, length=300, unit=UNIT_WORDS):
+def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS):
   matrices = list()
 
   for filename in matrix_files:
@@ -451,17 +470,66 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_S
   summary_list = list(summary_set)
   summary_list.sort()
   return_string = ''
+
+  print 'Summary:'
   for i in summary_list:
     return_string += get_sentence_index(i, sentencesLists)+'\n'
-    print(get_sentence_index(i, sentencesLists))
+    print('  '+get_sentence_index(i, sentencesLists))
   return return_string
- 
 
-def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=300, unit=UNIT_WORDS):
+def get_sentence_rep(sentence, wordmodel):
+  words = re.split('\W+', sentence)
+  sentence_rep = 0.0
+  count = 0.0
+  for w in words:
+    if w in wordmodel:
+      sentence_rep += wordmodel[w]
+      count = count + 1.0
+  return numpy.divide(sentence_rep, count)
+
+
+def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_cvs_similarity=True, w2v_vector_file=W2V_VECTOR_FILE):
   sentsims = get_def_sentsims(sentencesLists, stopwords, None)
 
   matrices = list()
-  matrices.append(sentsims["tfidf_cosine"])
+  flat_sentences = [sentence for document in sentencesLists for sentence in document]
+  if use_sentiment_similarity:
+    (pos, neg) = analyze_sentiment(flat_sentences)
+    matrices.append(pos)
+    matrices.append(neg)
+  if use_cvs_similarity:
+    print('Computing sentence similarities based on word2vec.')
+    if not os.path.isfile(w2v_vector_file):
+      print('Word2Vec vector file not found! Looked in '+w2v_vector_file+'. Will go on with other similarity measures.')
+    else:
+      from gensim.models import word2vec
+      statinfo = os.stat(w2v_vector_file)
+      if statinfo.st_size > 1073741824:
+        print('Loading word2vec file into memory. File is big (%d gigabytes). This might take a while.'%(statinfo.st_size/1073741824.0))
+      wordmodel = word2vec.Word2Vec.load_word2vec_format(w2v_vector_file, binary=True)
+      w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
+      for i in range(0, len(flat_sentences)):
+        sentence_rep_i = get_sentence_rep(flat_sentences[i], wordmodel)
+        for j in range(i, len(flat_sentences)):
+          sentence_rep_j = get_sentence_rep(flat_sentences[j], wordmodel)
+          w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_rep_i, sentence_rep_j)/numpy.sqrt(numpy.dot(sentence_rep_i, sentence_rep_i))+numpy.sqrt(numpy.dot(sentence_rep_j, sentence_rep_j))+1)
+          w2v_matrix[j][i] = w2v_matrix[i][j]
+      matrices.append(w2v_matrix)
+  if use_tfidf_similarity or len(matrices) == 0:
+    # this is also used for fallback if the others were specified and failed for some reason.
+    matrices.append(sentsims["tfidf_cosine"])
+
+  print 'Input sentences:'
+  for l in sentencesLists:
+    for s in l:
+      print '  '+s
+  print ''
+
+  #for m in matrices:
+  #  for i in range(0,m.shape[0]):
+  #    for j in range(0,m.shape[1]):
+  #      print str(m[i][j])+' ',
+  #    print 'EOL'
 
   summary_set = select_sentences(length,
                      matrices,
@@ -473,13 +541,14 @@ def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=300, u
   summary_list = list(summary_set)
   summary_list.sort()
   return_string = ''
+  print 'Summary:'
   for i in summary_list:
     return_string += get_sentence_index(i, sentencesLists)+'\n'
-    print(get_sentence_index(i, sentencesLists))
+    print('  '+get_sentence_index(i, sentencesLists))
   return return_string
  
 
-def summarize_files(document_names, length=300, unit=UNIT_WORDS):
+def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_cvs_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE):
   sentencesLists = list()
   for filename in document_names:
     f = open(filename, 'r')
@@ -488,8 +557,22 @@ def summarize_files(document_names, length=300, unit=UNIT_WORDS):
       if line:
         sentences.append(line)
     sentencesLists.append(sentences)
+  
+  if split_sentences:
+    #print 'splitting'
+    splittedLists = []
+    for l in sentencesLists:
+      splittedList = []
+      for s in l:
+        #splitted = re.split('[\.!?]', s)
+        splitted = re.split('(?<=[.!?]) +', s)
+        for s in splitted:
+          if s:
+            splittedList.append(s)
+      splittedLists.append(splittedList)
+    sentencesLists = splittedLists
 
-  return summarize_strings(sentencesLists, length=length, unit=unit)
+  return summarize_strings(sentencesLists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_cvs_similarity=use_cvs_similarity, w2v_vector_file=w2v_vector_file)
 
 def get_clustering(sentencesLists, stopwords=DEFAULT_STOPWORDS):
   sentsims = get_def_sentsims(sentencesLists, stopwords, None)
@@ -499,10 +582,61 @@ def get_clustering(sentencesLists, stopwords=DEFAULT_STOPWORDS):
 
 
 def main():
+  print '''Welcome to MULTSUM.
+
+1. To summarize a set of documents, run:
+
+   'python multsum.py inputfile1 inputfile2 ...'
+
+   Unless other things are specified with options, input files are assumed to be
+   text files with one sentence per line. Documents will be summarized with a
+   multiplicative aggregation of three similarity measures (See Mogren et.al. 2015):
+   TFIDF, Positive Sentiment, Negative Sentiment, and Continuous Vector Space models.
+
+   Options:
+
+     --split:           Split sentences using python nltk.
+     --no-tfidf:        Do not use similarity measure based on
+                        tfidf (See Lin&Bilmes, 2011) (Default is to use it).
+     --no-sentiment:    Do not use similarity measure based on
+                        sentiment analysis (See Mogren et.al. 2015) (Default is to use it).
+     --no-cvs:          Do not use similarity measure based on
+                        continuous vector space models (See Mogren et.al. 2015) (Default is to use it).
+     --v2v-file <path>: Specify where to find the bin-file with vectors from the word2vec tool.
+                        Pretrained vectors can be downloaded from http://code.google.com/p/word2vec/ .
+
+2. To use the sentence selection with user specified similarity matrices, run:
+
+   'python multsum.py --m matrixfile1 matrixfile2 ... [--s sentences_file]
+
+   If sentences_file is not provided, will output line-numbers instead of the actual summary.
+   The dimension of the similarity matrices need to match the number of sentences in file.
+   The file is assumed to be text files with one sentence per line.
+
+Global Options:
+
+   --summary-length <len>: Set summary length. (Default is 300 words).
+   --sumary-length-unit WORDS|CHARACTERS|SENTENCES: Set summary length unit (Default is WORDS).
+
+For questions, please contact olof@mogren.one.
+
+'''
   doc_files = True
   files = list()
   sentences_file = None
   skip = False
+
+  split_sentences = False
+
+  use_tfidf_similarity = True
+  use_sentiment_similarity = True
+  use_cvs_similarity = True
+
+  summary_length = DEFAULT_SUMMARY_LENGTH
+  summary_length_unit = UNIT_WORDS
+
+  w2v_vector_file = W2V_VECTOR_FILE
+
   for i in range(1,len(sys.argv)):
     if skip:
       skip = False
@@ -511,14 +645,35 @@ def main():
     if sys.argv[i] == '--m':
       # matrix files
       doc_files = False
+    elif sys.argv[i] == '--split':
+      split_sentences = True
+    elif sys.argv[i] == '--no-tfidf':
+      use_tfidf_similarity = False
+    elif sys.argv[i] == '--no-sentiment':
+      use_sentiment_similarity = False
+    elif sys.argv[i] == '--no-cvs':
+      use_cvs_similarity = False
+    elif sys.argv[i] == '--sumary-length':
+      summary_length = sys.argv[i+1]
+      skip = True
+    elif sys.argv[i] == '--sumary-length-unit':
+      summary_length_unit = LENGTH_UNITS[sys.argv[i+1]]
+      skip = True
+    elif sys.argv[i] == '--v2v-file':
+      w2v_vector_file = sys.argv[i+1]
+      skip = True
     elif sys.argv[i] == '--s':
       # matrix files
       sentences_file = sys.argv[i+1]
       skip = True
     else:
       files.append(sys.argv[i])
+  
   if doc_files:
-    summarize_files(files)
+    if not use_tfidf_similarity and not use_sentiment_similarity and not use_cvs_similarity:
+      print 'Using default TFIDF similarity measure, since no other was provided.'
+      use_tfidf_similarity = True
+    summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_cvs_similarity=use_cvs_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file)
   else:
     summarize_matrix_files(files, sentences_file)
 

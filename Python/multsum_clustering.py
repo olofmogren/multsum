@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
-import math, numpy, os.path, re, sys,time
+import math, numpy, os.path, re, sys,time, scipy.cluster.vq
 from subprocess import call
 
  # @author Olof Mogren
@@ -29,10 +29,12 @@ from subprocess import call
  # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/scluster"
-CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/vcluster"
+#CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/scluster"
 
-DEFAULT_STOPWORDS = '/home/mogren/Syncthing/Code/others_code/ROUGE/RELEASE-1.5.5/data/smart_common_words.txt'
+#CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/vcluster"
+CLUTO_VCLUSTER_EXECUTABLE = None
+
+DEFAULT_STOPWORDS = 'english_stopwords.txt'
 
 DEFAULT_VECTORS_FILE_PREFIX = '/tmp/submod_py_vectors.'
 
@@ -42,6 +44,13 @@ def getK(N):
   return K
 
 def getClusteringByVectors(sentenceVectors, K, vectorFileName = None, docName = None, keep=False):
+  if CLUTO_VCLUSTER_EXECUTABLE and os.path.isfile(CLUTO_VCLUSTER_EXECUTABLE):
+    return getClusteringByVectorsCluto(sentenceVectors, K, vectorFileName, docName, keep)
+  else:
+    print("Did not find cluto binary (looked in %s). Will try to cluster using scipy."%(CLUTO_VCLUSTER_EXECUTABLE))
+    return getClusteringByVectorsScipy(sentenceVectors, K, vectorFileName, docName, keep)
+
+def getClusteringByVectorsCluto(sentenceVectors, K, vectorFileName = None, docName = None, keep=False):
   clustering = list()
   if not docName:
     docName = "some_doc"
@@ -101,4 +110,8 @@ def getClusteringByVectors(sentenceVectors, K, vectorFileName = None, docName = 
       os.remove(outputfilename)
 
   return clustering
+
+def getClusteringByVectorsScipy(sentenceVectors, K, vectorFileName = None, docName = None, keep=False):
+  (centroid, label) = scipy.cluster.vq.kmeans2(sentenceVectors, K, minit='points')#, iter=10, thresh=1e-05, missing='warn', check_finite=True)
+  return label
 
