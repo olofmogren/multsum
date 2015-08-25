@@ -3,7 +3,7 @@
 
 import math, numpy, os.path, re, sys,time
 from stemming.porter2 import stem
-from subsum_clustering import *
+from multsum_clustering import *
 
  # @author Olof Mogren
  #
@@ -301,7 +301,7 @@ def select_sentences(summarySize,
   aggMatrix = getMultipliedAggregateSimilarities(matrices)
 
   K = getK(count_sentences(sentencesLists))
-  if sentenceVectors:
+  if not sentenceVectors is None:
     clustering = getClusteringByVectors(sentenceVectors, K, idfVectorFileName, docName)
   else:
    clustering = get_clustering(sentencesLists, DEFAULT_STOPWORDS)
