@@ -1,8 +1,3 @@
-word_category: language_english
-word_category: 
-word_category: emotion_negative
-data:
-
 abandoned
 abominable
 aching
@@ -309,12 +304,6 @@ victimised
 vulnerable
 wary
 wasteful
-
-word_category: language_english
-word_category: 
-word_category: emotion_negative
-data:
-
 afraid
 agitation
 aggressive

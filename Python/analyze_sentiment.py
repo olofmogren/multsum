@@ -1,4 +1,5 @@
 #!/usr/bin/python
+# -*- coding: utf-8 -*-
 
 import os, sys, re, math, numpy
 from sets import Set
@@ -21,8 +22,8 @@ def analyze_sentiment(sentences):
     #print s
     positive_count = 0
     negative_count = 0
-    positive_fraq = 0.0
-    negative_fraq = 0.0
+    positive_frac = 0.0
+    negative_frac = 0.0
     #words = s.split()
     words = re.findall(r"[\w']+", s)
     if len(words) > 0:
