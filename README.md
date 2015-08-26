@@ -7,13 +7,22 @@ Olof Mogren
 
 ## Prerequisites
 
-Both the Java and the Python version needs the CLUTO binary to run. It can be freely downloaded from:
+Both the Java and the Python version can use the CLUTO binary for clustering. It can be freely downloaded from:
 
 http://glaros.dtc.umn.edu/gkhome/cluto/cluto/download
+
+If not available, the Python version will use kmeans from scipy.
 
 Both versions also rely on a stopwords-list (there is one distributed with ROUGE that can be used). In the Java version, this can be specified on the command line. See usage below.
 
 At the time of writing, you have to specify the paths for these files in the source code. For the Java version, the paths are in SubSumBase.java, and for the Python version, the paths are in subsum.py and subsum\_clustering.py.
+
+
+
+## Using several similarity measures at the same time
+
+The default behaviour when specifying several similarity measures at the same time, is that they will be element-wise multiplied. This corresponds to a conjunctive combination of kernels in the field of kernel methods (even though these similarity measures are not necessarily PSD kernels).
+
 
 
 ## Java version
@@ -37,6 +46,15 @@ java SubSum.java --matrix-file <filename1> [--matrix-file <filename2> [--matrix-
 
 
 ## Python version
+
+### Requirements:
+
+Porter stemmer:
+  > pip install stemming
+Gensim for reading pretrained word2vec vectors (optional):
+  > pip install gensim
+
+
 
 ### Usage:
 
