@@ -178,14 +178,14 @@ def wordsLength(selected, sentencesLists):
     #words += len(re.split(REGEX_NONWORD, get_sentence_index(i, sentencesLists)))
   return words
 
-def summaryIsTooShort(selected, sentencesLists, lengthUnit, summarySize):
+def summary_is_too_short(selected, sentencesLists, lengthUnit, summarySize):
   if lengthUnit == UNIT_CHARACTERS:
     return charactersLength(selected, sentencesLists) < summarySize
   elif lengthUnit == UNIT_WORDS:
     return wordsLength(selected, sentencesLists) < summarySize
   else:
     return len(selected) < summarySize
-def summaryIsTooLong(selected, sentencesLists, lengthUnit, summarySize):
+def summary_is_too_long(selected, sentencesLists, lengthUnit, summarySize):
   if lengthUnit == UNIT_CHARACTERS:
     return charactersLength(selected, sentencesLists) > summarySize
   elif lengthUnit == UNIT_WORDS:
@@ -325,7 +325,7 @@ def select_sentences(summarySize,
   #for i in clustering:
   #  print i
 
-  while summaryIsTooShort(selected, sentencesLists, lengthUnit, summarySize):
+  while summary_is_too_short(selected, sentencesLists, lengthUnit, summarySize):
     max_val = 0.0
     argmax = None
     for i in range(0,aggMatrix.shape[0]):
@@ -355,7 +355,7 @@ def select_sentences(summarySize,
   for i in range(0,aggMatrix.shape[0]):
     singleton = set()
     singleton.add(i)
-    if not summaryIsTooLong(singleton, sentencesLists, lengthUnit, summarySize):
+    if not summary_is_too_long(singleton, sentencesLists, lengthUnit, summarySize):
       singletonSummaryScore = L1(singleton, aggMatrix, None, A) + DEFAULT_LAMBDA * R1(singleton, aggMatrix, clustering, K)
       if singletonSummaryScore > currentlyBestCScore:
         currentlyBestCScore = singletonSummaryScore
@@ -602,7 +602,7 @@ def main():
 
    Options:
 
-     --split:           Split sentences using python nltk.
+     --split:           Split sentences using regex.
      --no-tfidf:        Do not use similarity measure based on
                         tfidf (See Lin&Bilmes, 2011) (Default is to use it).
      --no-sentiment:    Do not use similarity measure based on
@@ -678,7 +678,7 @@ For questions, please contact olof@mogren.one.
   
   if doc_files:
     if not use_tfidf_similarity and not use_sentiment_similarity and not use_cvs_similarity:
-      print 'Using default TFIDF similarity measure, since no other was provided.'
+      print 'Using default LinTFIDF similarity measure, since no other was provided.'
       use_tfidf_similarity = True
     summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_cvs_similarity=use_cvs_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file)
   else:
