@@ -34,9 +34,8 @@ import multsum, w2v_worker, w2v_client
 HOST_NAME        = '' # !!!REMEMBER TO CHANGE THIS!!!
 PORT_NUMBER      = 9191 # Maybe set this to 9000.
 
-use_cvs_similarity = True
-w2v_wordmodel      = None
-show_exit_button   = True
+use_w2v_similarity = True
+show_exit_button   = False
 
 BASE_DOCUMENT_PREFIX = '''<!DOCTYPE html>
 <html>
@@ -135,8 +134,7 @@ function checkW2V()
         console.log(xhr.responseText);
         if(xhr.responseText == 'OK')
         {
-          document.getElementById('w2v_label').style.visibility = "visible";
-          document.getElementById('w2v').style.visibility = "visible";
+          document.getElementById('w2v_label').style.color = "#000";
           document.getElementById('w2v').disabled = false;
           document.getElementById('w2v').checked  = true;
         }
@@ -183,8 +181,8 @@ BASE_DOCUMENT_FORM_1 = '''
         <input type="checkbox" id="sentiment" name="sentiment" value="sentiment" checked="checked" />
         <label for="sentiment">Sentiment</label>
         <br />
-        <input type="checkbox" id="w2v" name="w2v" value="w2v" disabled="disabled" style="visibility: hidden;" />
-        <label for="w2v" id="w2v_label" style="visibility: hidden;">Word2Vec</label>
+        <input type="checkbox" id="w2v" name="w2v" value="w2v" disabled="disabled" />
+        <label for="w2v" id="w2v_label" style="color: #ccc;">Word2Vec</label>
       </div>
     <br />
 '''
@@ -256,7 +254,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     MyHandler.respond(s)
 
   def respond(s):
-    global w2v_wordmodel, show_exit_button
+    global show_exit_button
     """Respond to a POST request."""
     print 'path: '+s.path
     if s.path == '/exit':
@@ -281,7 +279,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       print 'length: '+str(summary_length)
       tfidf          = (post_data['tfidf'][0] == "tfidf")
       sentiment      = (post_data['sentiment'][0] == "sentiment")
-      w2v            = (post_data['w2v'][0] == "w2v")# and w2v_wordmodel)
+      w2v            = (post_data['w2v'][0] == "w2v")
       for key, value in post_data.iteritems():
         print "%s=%s" % (key, value)
         #if key == 'input_text': input_text = value
@@ -289,7 +287,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       input_text = convert_all(input_text)
       #print input_text.encode('latin1').decode('utf-8')
 
-      summary = multsum.summarize_strings([[input_text]], length=summary_length, use_tfidf_similarity=tfidf, use_sentiment_similarity=sentiment, use_cvs_similarity=w2v, split_sentences=True, preloaded_cvs_wordmodel=w2v_wordmodel)
+      summary = multsum.summarize_strings([[input_text]], length=summary_length, use_tfidf_similarity=tfidf, use_sentiment_similarity=sentiment, use_w2v_similarity=w2v, split_sentences=True, w2v_backend=True)
 
       s.send_response(200)
       s.send_header("Content-type", "text/plain;charset=UTF-8")
@@ -310,7 +308,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       s.send_response(200)
       s.send_header("Content-type", "text/plain;charset=UTF-8")
       s.end_headers()
-      if w2v_client.w2v_check():
+      if use_w2v_similarity and w2v_client.w2v_check():
         s.wfile.write('OK')
       else:
         s.wfile.write('NOK')
@@ -321,12 +319,6 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       s.end_headers()
       s.wfile.write('''<html><head><title>404: Page not found.</title></head><body><h1>404: Page not found</h1></body></html>
       ''')
-
-def init_model():
-  global w2v_wordmodel
-  print 'init_model()'
-  w2v_wordmodel = multsum.load_cvs_wordmodel()
-  print 'init_model() done.'
 
 def runServer(arg):
   server_class = BaseHTTPServer.HTTPServer
@@ -375,17 +367,17 @@ if __name__ == '__main__':
   for i in range(1,len(sys.argv)):
     if sys.argv[i] == '--no-browser':
       launch_browser = False
-    elif sys.argv[i] == '--no-exit-button':
-      show_exit_button = False
-    elif sys.argv[i] == '--no-cvs':
-      use_cvs_similarity = False
+    elif sys.argv[i] == '--no-w2v':
+      use_w2v_similarity = False
+    #elif sys.argv[i] == '--no-exit-button':
+    #  show_exit_button = False
 
   #p_model = Process(target=init_model)
   #p_model.start()
   p = Process(target=runServer, args=('bob',))
   p.start()
   w2v_started = False
-  if use_cvs_similarity:
+  if use_w2v_similarity:
     #if not w2v_client.w2v_check(recv_timeout=50):
       p_w2v = Process(target=w2v_worker.run_backend, args={'replace': True})
       p_w2v.start()
@@ -395,6 +387,10 @@ if __name__ == '__main__':
       run_browser()
       try:
         p.terminate()
+        if w2v_started:
+          print('Sending exit command to w2v worker.')
+          w2v_client.w2v_exit()
+          p_w2v.join()
       except:
         print 'Failed to kill server. Please do so manually.'
     except:
@@ -405,10 +401,7 @@ if __name__ == '__main__':
         print 'Failed to start web interface. Start a broswer, and point it to http://localhost:9191/.'
   else:
     print 'Open a browser and point it to http://localhost:9191/.'
-  if w2v_started:
-    print('Sending exit command to w2v worker.')
-    w2v_client.w2v_exit()
-    p_w2v.join()
+  
   print('Joining web server.')
   p.join()
   print('Done.')

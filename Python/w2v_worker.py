@@ -33,16 +33,18 @@ def init():
 
 def run_backend(replace=False):
   init()
+  repr_req_count = 0
 
   if replace:
     try:
       print( 'Trying to replace a running backend.')
       print( 'Connecting to backend.')
+      sys.stdout.flush()
       conn = Client(BACKEND_ADDRESS, family=BACKEND_CONNECTION_FAMILY, authkey=BACKEND_PASSWORD)
       conn.send({'command': 'EXIT_NOW'})
       conn.close()
       conn = None
-      print( 'Waiting 30 secs for old backend to clean uo.')
+      print( 'Waiting 30 secs for old backend to clean up.')
       time.sleep(30)
     except:
       print( 'Did not manage to find a backend to kill.')

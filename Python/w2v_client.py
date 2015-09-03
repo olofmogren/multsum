@@ -116,5 +116,18 @@ def w2v_get_representation(term):
   return rep
 
 def w2v_exit():
-  w2v_carry_out({'command': 'EXIT_NOW'})
+  try:
+    if not conn:
+      print( 'No connection')
+      w2v_open()
+      print( 'Connection established!')
+    else:
+      print( 'There is a connection')
+
+    conn.send({'command': 'EXIT_NOW'})
+    conn.close()
+    conn = None
+    #w2v_carry_out({'command': 'EXIT_NOW'})
+  except Exception,e:
+    print('Connection error. Check for ghost processes.')
 
