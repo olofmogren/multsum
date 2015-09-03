@@ -8,7 +8,7 @@ from analyze_sentiment import analyze_sentiment
 
  # @author Olof Mogren
  #
- # email: olof.mogren@gmail.com
+ # email: olof@mogren.one
  #
  # 
  # Base class for submodular summarization.
@@ -52,7 +52,7 @@ REGEX_SPACE_COMMA   = "\\s+|,"
 REGEX_NONWORD       = "[^\\p{L}\\p{Nd}]+"
 
 DEFAULT_STOPWORDS   = 'english_stopwords.txt'
-W2V_VECTOR_FILE     = 'GoogleNews-vectors-negative300.bin'
+W2V_VECTOR_FILE     = '/home/mogren/Downloads/GoogleNews-vectors-negative300.bin'
 
 def L1(S, w, alpha, a):
   if not alpha:
@@ -488,7 +488,7 @@ def get_sentence_rep(sentence, wordmodel):
   return numpy.divide(sentence_rep, count)
 
 
-def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_cvs_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False):
+def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_cvs_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False, preloaded_cvs_wordmodel=None):
 
   print 'summarize_strings()'
   for l in sentencesLists:
@@ -519,14 +519,11 @@ def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAUL
     matrices.append(neg)
   if use_cvs_similarity:
     print('Computing sentence similarities based on word2vec.')
-    if not os.path.isfile(w2v_vector_file):
-      print('Word2Vec vector file not found! Looked in '+w2v_vector_file+'. Will go on with other similarity measures.')
+    if preloaded_cvs_wordmodel:
+      wordmodel = preloaded_cvs_wordmodel
     else:
-      from gensim.models import word2vec
-      statinfo = os.stat(w2v_vector_file)
-      if statinfo.st_size > 1073741824:
-        print('Loading word2vec file into memory. File is big (%d gigabytes). This might take a while. Run with --no-cvs to not use word2vec.'%(statinfo.st_size/1073741824.0))
-      wordmodel = word2vec.Word2Vec.load_word2vec_format(w2v_vector_file, binary=True)
+      wordmodel = load_cvs_wordmodel(w2v_vector_file)
+    if wordmodel:
       w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
       for i in range(0, len(flat_sentences)):
         sentence_rep_i = get_sentence_rep(flat_sentences[i], wordmodel)
@@ -568,7 +565,7 @@ def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAUL
   return return_string
  
 
-def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_cvs_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE):
+def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_cvs_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE, preloaded_cvs_wordmodel=None):
   sentencesLists = list()
   for filename in document_names:
     f = open(filename, 'r')
@@ -579,7 +576,18 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
     sentencesLists.append(sentences)
   
 
-  return summarize_strings(sentencesLists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_cvs_similarity=use_cvs_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences)
+  return summarize_strings(sentencesLists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_cvs_similarity=use_cvs_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences, preloaded_cvs_wordmodel=preloaded_cvs_wordmodel)
+
+def load_cvs_wordmodel(w2v_vector_file=W2V_VECTOR_FILE):
+  if not os.path.isfile(w2v_vector_file):
+    print('Word2Vec vector file not found! Looked in '+w2v_vector_file+'. Will go on without this similarity measure.')
+    return None
+  else:
+    from gensim.models import word2vec
+    statinfo = os.stat(w2v_vector_file)
+    if statinfo.st_size > 1073741824:
+      print('Loading word2vec file into memory. File is big (%d gigabytes). This might take a while. Run with --no-cvs to not use word2vec.'%(statinfo.st_size/1073741824.0))
+    return word2vec.Word2Vec.load_word2vec_format(w2v_vector_file, binary=True)
 
 def get_clustering(sentencesLists, stopwords=DEFAULT_STOPWORDS):
   sentsims = get_def_sentsims(sentencesLists, stopwords, None)
