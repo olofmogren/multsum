@@ -52,7 +52,7 @@ REGEX_SPACE         = "\\W+"
 REGEX_SPACE_COMMA   = "\\s+|,"
 REGEX_NONWORD       = "[^\\p{L}\\p{Nd}]+"
 
-DEFAULT_STOPWORDS   = 'english_stopwords.txt'
+DEFAULT_STOPWORDS   = os.path.split(os.path.realpath(__file__))[0]+'/english_stopwords.txt'
 W2V_VECTOR_FILE     = '/home/mogren/Downloads/GoogleNews-vectors-negative300.bin'
 
 def L1(S, w, alpha, a):
