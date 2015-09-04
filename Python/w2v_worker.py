@@ -19,20 +19,24 @@ W2V_VECTOR_FILE = '/home/mogren/tmp/GoogleNews-vectors-negative300.bin'
 
 wordmodel = None
 
-def init():
+def init(w2v_vector_file=W2V_VECTOR_FILE):
   global wordmodel
   print( 'Initializing. Python version: '+str(sys.version_info.major)+'.'+str(sys.version_info.minor)+'.'+str(sys.version_info.micro))
 
   print( 'Initializing word model...')
   sys.stdout.flush()
   t = time.time()
-  wordmodel = word2vec.Word2Vec.load_word2vec_format(W2V_VECTOR_FILE, binary=True)
+  try:
+    wordmodel = word2vec.Word2Vec.load_word2vec_format(W2V_VECTOR_FILE, binary=True)
+  except IOError, e:
+    print 'Error reading '+w2v_vector_file+'. Please provide a working w2v binary file.'
+    wordmodel = {}
   print( 'done. %.3f secs'%(time.time()-t))
   sys.stdout.flush()
 
 
-def run_backend(replace=False):
-  init()
+def run_backend(replace=False, w2v_vector_file=W2V_VECTOR_FILE):
+  init(w2v_vector_file=w2v_vector_file)
   repr_req_count = 0
 
   if replace:

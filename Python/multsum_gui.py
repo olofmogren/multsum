@@ -363,12 +363,21 @@ if __name__ == '__main__':
   signal.signal(signal.SIGINT, signal.SIG_DFL)
   
   launch_browser = True
+  w2v_vector_file = None
 
+  skip = False
   for i in range(1,len(sys.argv)):
+    if skip:
+      skip = False
+      continue
     if sys.argv[i] == '--no-browser':
       launch_browser = False
     elif sys.argv[i] == '--no-w2v':
       use_w2v_similarity = False
+    elif sys.argv[i] == '--w2v-file':
+      w2v_vector_file = sys.argv[i+1]
+      skip = True
+            
     #elif sys.argv[i] == '--no-exit-button':
     #  show_exit_button = False
 
@@ -379,7 +388,7 @@ if __name__ == '__main__':
   w2v_started = False
   if use_w2v_similarity:
     #if not w2v_client.w2v_check(recv_timeout=50):
-      p_w2v = Process(target=w2v_worker.run_backend, args={'replace': True})
+      p_w2v = Process(target=w2v_worker.run_backend, args={'replace': True, 'w2v_vector_file': w2v_vector_file})
       p_w2v.start()
       w2v_started = True
   if launch_browser:
