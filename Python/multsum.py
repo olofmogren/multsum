@@ -55,6 +55,52 @@ REGEX_NONWORD       = "[^\\p{L}\\p{Nd}]+"
 DEFAULT_STOPWORDS   = os.path.split(os.path.realpath(__file__))[0]+'/english_stopwords.txt'
 W2V_VECTOR_FILE     = '/home/mogren/tmp/GoogleNews-vectors-negative300.bin'
 
+WELCOME_MESSAGE     = '''Welcome to MULTSUM.
+
+Some of the options below can also be used with the GUI for MULTSUM, multsum_gui.py.
+
+1. To summarize a set of documents, run:
+
+   'python multsum.py inputfile1 inputfile2 ...'
+
+   Unless other things are specified with options, input files are assumed to be
+   text files with one sentence per line. Documents will be summarized with a
+   multiplicative aggregation of three similarity measures (See Mogren et.al. 2015):
+   TFIDF, Positive Sentiment, Negative Sentiment, and Continuous Vector Space models.
+
+   Options:
+
+     --split:           Split sentences using regex.
+     --no-tfidf:        Do not use similarity measure based on
+                        tfidf (See Lin&Bilmes, 2011) (Default is to use it).
+     --no-sentiment:    Do not use similarity measure based on
+                        sentiment analysis (See Mogren et.al. 2015) (Default is to use it).
+     --no-w2v:          Do not use similarity measure based on
+                        continuous vector space models (See Mogren et.al. 2015) (Default is to use it).
+                        (This option is available in multsum_gui.py).
+     --w2v-file <path>: Specify where to find the bin-file with vectors from the word2vec tool.
+                        Pretrained vectors can be downloaded from http://code.google.com/p/word2vec/ .
+                        (This option is available in multsum_gui.py).
+     --w2v-backend:     Try to connect to running backend providing word vectors. See w2v_worker.py.
+
+2. To use the sentence selection with user specified similarity matrices, run:
+
+   'python multsum.py --m matrixfile1 matrixfile2 ... [--s sentences_file]
+
+   If sentences_file is not provided, will output line-numbers instead of the actual summary.
+   Line-numbers in the output starts at number one!
+   The dimension of the similarity matrices need to match the number of sentences in file.
+   The file is assumed to be text files with one sentence per line.
+
+Global Options:
+
+   --summary-length <len>: Set summary length. (Default is 300 words).
+   --sumary-length-unit WORDS|CHARACTERS|SENTENCES: Set summary length unit (Default is WORDS).
+
+For questions, please contact olof@mogren.one.
+
+'''
+
 def L1(S, w, alpha, a):
   if not alpha:
     alpha = a/(1.0*w.shape[0])
@@ -474,8 +520,11 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_S
 
   print 'Summary:'
   for i in summary_list:
-    return_string += get_sentence_index(i, sentencesLists)+'\n'
-    print('  '+get_sentence_index(i, sentencesLists))
+    if sentencesLists:
+      return_string += get_sentence_index(i, sentencesLists)+'\n'
+      print('  '+get_sentence_index(i, sentencesLists))
+    else
+      print(i+1) #one-based output, not zero-based.
   return return_string
 
 def get_sentence_rep(sentence, wordmodel, w2v_backend):
@@ -606,46 +655,8 @@ def get_clustering(sentencesLists, stopwords=DEFAULT_STOPWORDS):
 
 
 def main():
-  print '''Welcome to MULTSUM.
-
-1. To summarize a set of documents, run:
-
-   'python multsum.py inputfile1 inputfile2 ...'
-
-   Unless other things are specified with options, input files are assumed to be
-   text files with one sentence per line. Documents will be summarized with a
-   multiplicative aggregation of three similarity measures (See Mogren et.al. 2015):
-   TFIDF, Positive Sentiment, Negative Sentiment, and Continuous Vector Space models.
-
-   Options:
-
-     --split:           Split sentences using regex.
-     --no-tfidf:        Do not use similarity measure based on
-                        tfidf (See Lin&Bilmes, 2011) (Default is to use it).
-     --no-sentiment:    Do not use similarity measure based on
-                        sentiment analysis (See Mogren et.al. 2015) (Default is to use it).
-     --no-w2v:          Do not use similarity measure based on
-                        continuous vector space models (See Mogren et.al. 2015) (Default is to use it).
-     --w2v-file <path>: Specify where to find the bin-file with vectors from the word2vec tool.
-                        Pretrained vectors can be downloaded from http://code.google.com/p/word2vec/ .
-     --w2v-backend:     Try to connect to running backend providing word vectors. See w2v_worker.py.
-
-2. To use the sentence selection with user specified similarity matrices, run:
-
-   'python multsum.py --m matrixfile1 matrixfile2 ... [--s sentences_file]
-
-   If sentences_file is not provided, will output line-numbers instead of the actual summary.
-   The dimension of the similarity matrices need to match the number of sentences in file.
-   The file is assumed to be text files with one sentence per line.
-
-Global Options:
-
-   --summary-length <len>: Set summary length. (Default is 300 words).
-   --sumary-length-unit WORDS|CHARACTERS|SENTENCES: Set summary length unit (Default is WORDS).
-
-For questions, please contact olof@mogren.one.
-
-'''
+  print WELCOME_MESSAGE
+  
   doc_files = True
   files = list()
   sentences_file = None

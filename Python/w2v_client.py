@@ -38,6 +38,7 @@ def w2v_check(recv_timeout=RECV_TIMEOUT):
       conn = None
       return True
     else:
+      print( 'Response was not OK.')
       conn.send({'command': 'CLOSE'})
       conn.close()
       conn = None

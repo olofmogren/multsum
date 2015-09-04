@@ -359,6 +359,7 @@ def run_browser():
 
 
 if __name__ == '__main__':
+  print multsum.WELCOME_MESSAGE
   import signal
   signal.signal(signal.SIGINT, signal.SIG_DFL)
   

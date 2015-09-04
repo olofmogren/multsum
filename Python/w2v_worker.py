@@ -30,7 +30,7 @@ def init(w2v_vector_file=W2V_VECTOR_FILE):
     wordmodel = word2vec.Word2Vec.load_word2vec_format(W2V_VECTOR_FILE, binary=True)
   except IOError, e:
     print 'Error reading '+w2v_vector_file+'. Please provide a working w2v binary file.'
-    wordmodel = {}
+    #wordmodel = None
   print( 'done. %.3f secs'%(time.time()-t))
   sys.stdout.flush()
 
@@ -90,13 +90,19 @@ def run_backend(replace=False, w2v_vector_file=W2V_VECTOR_FILE):
           # do something with msg
           if msg['command'] == 'wordmodel':
             repr_req_count = repr_req_count+1
+            if not wordmodel:
+              conn.send({'status': 'FAIL', 'value': '\'Looking for term: '+msg['term']+'\': wordmodel does not seem to be inizialized. Was the vector file not found?'})
             #print msg['command']+': '+msg['term']
-            if msg['term'] in wordmodel:
-              conn.send({'status':'OK', 'value': wordmodel[msg['term']]})
             else:
-              conn.send({'status': 'FAIL', 'value': '\''+msg['term']+'\': No such term found in '+msg['command']+'.'})
+              if msg['term'] in wordmodel:
+                conn.send({'status':'OK', 'value': wordmodel[msg['term']]})
+              else:
+                conn.send({'status': 'FAIL', 'value': '\''+msg['term']+'\': No such term found in '+msg['command']+'.'})
           elif msg['command'] == 'PING':
-            conn.send({'status': 'OK', 'value': 'PONG'})
+            if not wordmodel:
+              conn.send({'status': 'FAIL', 'value': '\'Got PING. But wordmodel does not seem to be inizialized. Was the vector file not found?'})
+            else:
+              conn.send({'status': 'OK', 'value': 'PONG'})
           elif msg['command'] == 'CLOSE':
             epoll.unregister(conn.fileno())
             del connections[conn.fileno()]
