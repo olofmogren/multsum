@@ -121,7 +121,7 @@ function leaving(e)
       e.preventDefault();
     }
 }
-window.onbeforeunload = leaving
+//window.onbeforeunload = leaving
 
 function checkW2V()
 {
@@ -390,7 +390,7 @@ if __name__ == '__main__':
         if w2v_started:
           print('Sending exit command to w2v worker.')
           w2v_client.w2v_exit()
-          p_w2v.join()
+          p_w2v.terminate()
       except:
         print 'Failed to kill server. Please do so manually.'
     except:
