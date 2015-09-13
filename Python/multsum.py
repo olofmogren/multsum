@@ -523,7 +523,7 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_S
     if sentencesLists:
       return_string += get_sentence_index(i, sentencesLists)+'\n'
       print('  '+get_sentence_index(i, sentencesLists))
-    else
+    else:
       print(i+1) #one-based output, not zero-based.
   return return_string
 

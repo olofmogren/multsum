@@ -35,11 +35,11 @@ def init(w2v_vector_file=W2V_VECTOR_FILE):
   sys.stdout.flush()
 
 
-def run_backend(replace=False, w2v_vector_file=W2V_VECTOR_FILE):
+def run_backend(replace=False, exit=False, w2v_vector_file=W2V_VECTOR_FILE):
   init(w2v_vector_file=w2v_vector_file)
   repr_req_count = 0
 
-  if replace:
+  if replace or exit:
     try:
       print( 'Trying to replace a running backend.')
       print( 'Connecting to backend.')
@@ -48,10 +48,15 @@ def run_backend(replace=False, w2v_vector_file=W2V_VECTOR_FILE):
       conn.send({'command': 'EXIT_NOW'})
       conn.close()
       conn = None
-      print( 'Waiting 30 secs for old backend to clean up.')
-      time.sleep(30)
+      if not exit:
+        print( 'Waiting 30 secs for old backend to clean up.')
+        time.sleep(30)
     except:
       print( 'Did not manage to find a backend to kill.')
+
+  if exit:
+    print('Exiting.')
+    sys.exit()
 
   connections = {}
   epoll = select.epoll()
@@ -103,6 +108,8 @@ def run_backend(replace=False, w2v_vector_file=W2V_VECTOR_FILE):
               conn.send({'status': 'FAIL', 'value': '\'Got PING. But wordmodel does not seem to be inizialized. Was the vector file not found?'})
             else:
               conn.send({'status': 'OK', 'value': 'PONG'})
+          elif msg['command'] == 'CAPABILITIES':
+            conn.send({'status': 'OK', 'value': 'WORDMODEL'})
           elif msg['command'] == 'CLOSE':
             epoll.unregister(conn.fileno())
             del connections[conn.fileno()]
@@ -144,11 +151,13 @@ def run_backend(replace=False, w2v_vector_file=W2V_VECTOR_FILE):
 if __name__ == "__main__":
   '''
     -r, --replace: replace a running daemon.
+    -e, --exit:    tell a running daemon to exit.
   '''
   replace = False
+  exit = False
   # parse command line options
   try:
-    opts, args = getopt.getopt(sys.argv[1:], "r:h", ["replace", "help"])
+    opts, args = getopt.getopt(sys.argv[1:], "r:h:e", ["replace", "help", "exit"])
   except getopt.GetoptError, msg:
     print( str(msg))
     print( "for help use --help")
@@ -161,4 +170,7 @@ if __name__ == "__main__":
     if o in ("-r", "--replace"):
       print( 'Will try to replace a running backend. First initialize.')
       replace = True
-  run_backend(replace)
+    if o in ("-e", "--exit"):
+      print( 'Will try to tell a running backend to exit.')
+      exit = True
+  run_backend(replace=replace, exit=exit)

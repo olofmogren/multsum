@@ -273,26 +273,35 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       print 'Got summarize command'
       # Extract and print the contents of the POST
       length = int(s.headers['Content-Length'])
-      post_data = urlparse.parse_qs(s.rfile.read(length).decode('utf-8'))
-      input_text     = post_data['input_text'][0]
-      summary_length = int(post_data['summary_length'][0])
-      print 'length: '+str(summary_length)
-      tfidf          = (post_data['tfidf'][0] == "tfidf")
-      sentiment      = (post_data['sentiment'][0] == "sentiment")
-      w2v            = (post_data['w2v'][0] == "w2v")
-      for key, value in post_data.iteritems():
-        print "%s=%s" % (key, value)
-        #if key == 'input_text': input_text = value
-      #print u'input_text: '+convert_all(input_text)
-      input_text = convert_all(input_text)
-      #print input_text.encode('latin1').decode('utf-8')
-
-      summary = multsum.summarize_strings([[input_text]], length=summary_length, use_tfidf_similarity=tfidf, use_sentiment_similarity=sentiment, use_w2v_similarity=w2v, split_sentences=True, w2v_backend=True)
+      err = None
+      try:
+        post_data = urlparse.parse_qs(s.rfile.read(length).decode('utf-8'))
+        input_text     = post_data['input_text'][0]
+        summary_length = int(post_data['summary_length'][0])
+        print 'length: '+str(summary_length)
+        tfidf          = (post_data['tfidf'][0] == "tfidf")
+        sentiment      = (post_data['sentiment'][0] == "sentiment")
+        w2v            = (post_data['w2v'][0] == "w2v")
+        for key, value in post_data.iteritems():
+          print "%s=%s" % (key, value)
+          #if key == 'input_text': input_text = value
+        #print u'input_text: '+convert_all(input_text)
+        input_text = convert_all(input_text)
+        #print input_text.encode('latin1').decode('utf-8')
+      except:
+        err = 'Failure while processing input. Please make sure that you input valid text.'
+      try:
+        summary = multsum.summarize_strings([[input_text]], length=summary_length, use_tfidf_similarity=tfidf, use_sentiment_similarity=sentiment, use_w2v_similarity=w2v, split_sentences=True, w2v_backend=True)
+      except:
+        err = 'Failed to run the summarization subsystem. Internal error. Make sure that your input is valid.'
 
       s.send_response(200)
       s.send_header("Content-type", "text/plain;charset=UTF-8")
       s.end_headers()
-      s.wfile.write(summary.encode('utf-8'))
+      if not err:
+        s.wfile.write(summary.encode('utf-8'))
+      else:
+        s.wfile.write(err)
     elif s.path == '/':
       print 'Got root request.'
       s.send_response(200)
