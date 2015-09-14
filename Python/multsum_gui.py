@@ -28,7 +28,9 @@
 
 import time, BaseHTTPServer, urlparse, webbrowser, threading, sys, re
 from multiprocessing import Process
-import multsum, w2v_worker, w2v_client
+from threading import Thread
+import multsum, backend_worker, backend_client
+
 
 
 HOST_NAME        = '' # !!!REMEMBER TO CHANGE THIS!!!
@@ -125,7 +127,7 @@ function leaving(e)
 
 function checkW2V()
 {
-  var requestPath = '/w2v_status';
+  var requestPath = '/backend_status';
   var xhr = new XMLHttpRequest();
   xhr.open("GET", requestPath, true);
   xhr.onload = function (e) {
@@ -207,7 +209,7 @@ BASE_DOCUMENT_FORM_2 = '''      <button id="submit_button" onclick="request('sub
 BASE_DOCUMENT_SUFFIX = '''
 
 
-<p style="font-size: 10px; font-family: arial;">For more information, please visit <a href="http://mogren.one/">mogren.one</a>.</p>
+<p style="font-size: 10px; font-family: arial;">For more information, please visit <a href="http://mogren.one/" target="_blank">mogren.one</a>.</p>
 
 <p style="font-size: 10px; font-family: arial;">Relevant publications:
 <br />
@@ -243,7 +245,16 @@ def convert(s):
 def convert_all(s):
   return re.sub(r'[\x80-\xFF]+', convert, s)
 
-class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class ThreadedHTTPServer(HTTPServer):
+  def process_request(self, request, client_address):
+    thread = Thread(target=self.__new_request, args=(self.RequestHandlerClass, request, client_address, self))
+    thread.start()
+  def __new_request(self, handlerClass, request, address, server):
+    handlerClass(request, address, server)
+    self.shutdown_request(request)
+
+
+class MyHandler(BaseHTTPRequestHandler):
   def do_HEAD(s):
     s.send_response(200)
     s.send_header("Content-type", "text/html")
@@ -266,7 +277,7 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         s.send_header("Content-type", "text/plain;charset=UTF-8")
         s.end_headers()
         s.wfile.write('System is exiting.')
-        assassin = threading.Thread(target=s.server.shutdown)
+        assassin = Thread(target=s.server.shutdown)
         assassin.daemon = True
         assassin.start()
     elif s.path == '/get_summary':
@@ -313,11 +324,11 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         s.wfile.write(BASE_DOCUMENT_FORM_EXIT_BUTTON)
       s.wfile.write(BASE_DOCUMENT_FORM_2)
       s.wfile.write(BASE_DOCUMENT_SUFFIX)
-    elif s.path == '/w2v_status':
+    elif s.path == '/backend_status':
       s.send_response(200)
       s.send_header("Content-type", "text/plain;charset=UTF-8")
       s.end_headers()
-      if use_w2v_similarity and w2v_client.w2v_check():
+      if use_w2v_similarity and backend_client.backend_check():
         s.wfile.write('OK')
       else:
         s.wfile.write('NOK')
@@ -329,8 +340,8 @@ class MyHandler(BaseHTTPServer.BaseHTTPRequestHandler):
       s.wfile.write('''<html><head><title>404: Page not found.</title></head><body><h1>404: Page not found</h1></body></html>
       ''')
 
-def runServer(arg):
-  server_class = BaseHTTPServer.HTTPServer
+def run_server(arg):
+  server_class = ThreadedHTTPServer
   httpd = server_class((HOST_NAME, PORT_NUMBER), MyHandler)
     
   print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
@@ -360,7 +371,7 @@ def run_browser():
   #self.webview.show()
   #scrolled_window.show()
   win.show_all()
-  webview.load_uri('http://localhost:9191/')
+  webview.load_uri('http://localhost:%s/'%(str(PORT_NUMBER)))
   win.resize(1000, 800)
 
   #browser = Browser()
@@ -393,35 +404,35 @@ if __name__ == '__main__':
 
   #p_model = Process(target=init_model)
   #p_model.start()
-  p = Process(target=runServer, args=('bob',))
+  p = Process(target=run_server, args=('bob',))
   p.start()
-  w2v_started = False
+  backend_started = False
   if use_w2v_similarity:
-    #if not w2v_client.w2v_check(recv_timeout=50):
-      p_w2v = Process(target=w2v_worker.run_backend, args={'replace': True, 'w2v_vector_file': w2v_vector_file})
-      p_w2v.start()
-      w2v_started = True
+    if not backend_client.backend_check() and not backend_client.backend_is_initializing():
+      p_backend = Process(target=w2v_worker.run_backend, args={'capabilities': backend_worker.CAPABILITIES_W2V_ONLY, 'w2v_vector_file': w2v_vector_file})
+      p_backend.start()
+      backend_started = True
   if launch_browser:
     try:
       run_browser()
       try:
         p.terminate()
-        if w2v_started:
+        if backend_started:
           print('Sending exit command to w2v worker.')
-          w2v_client.w2v_exit()
-          p_w2v.terminate()
+          backend_client.backend_exit()
+          p_backend.terminate()
       except:
         print 'Failed to kill server. Please do so manually.'
     except:
       print 'Failed internal browser. Will try to launch system broswer.'
       try:
-        webbrowser.open('http://localhost:9191/')
+        webbrowser.open('http://localhost:%s/'%(str(PORT_NUMBER)))
       except:
         print 'Failed to start web interface. Start a broswer, and point it to http://localhost:9191/.'
   else:
     print 'Open a browser and point it to http://localhost:9191/.'
   
-  print('Joining web server.')
+  print('Waiting web server to finish.')
   p.join()
   print('Done.')
   #p_model.join()
