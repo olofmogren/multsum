@@ -6,7 +6,7 @@ from nltk.stem.porter import PorterStemmer
 from multiprocessing.connection import Client
 from subprocess import call
 
-from w2v_worker import BACKEND_ADDRESS, BACKEND_CONNECTION_FAMILY, BACKEND_PASSWORD
+from backend_worker import BACKEND_ADDRESS, BACKEND_CONNECTION_FAMILY, BACKEND_PASSWORD
 
 USE_BACKEND = True
 RECV_TIMEOUT = 2000
@@ -19,11 +19,11 @@ stemmer = None
 ######### FUNCTIONS TO BE USED OUTSIDE OF THIS FILE ##############################
 ##################################################################################
 
-def w2v_check(recv_timeout=RECV_TIMEOUT):
+def backend_check(recv_timeout=RECV_TIMEOUT):
   global conn
   try:
     if not conn:
-      w2v_open()
+      backend_open()
     conn.send({'command': 'PING'})
     print( 'Awaiting reply from backend for PING')
     ready = select.select([conn], [], [], recv_timeout)
@@ -44,20 +44,48 @@ def w2v_check(recv_timeout=RECV_TIMEOUT):
       conn = None
       return False
   except:
-    print( 'Checking backend failed!')
+    print('Checking backend failed!')
     return False
 
-def w2v_open():
+def backend_is_initializing():
   global conn
-  print( 'w2v_open()')
+  try:
+    if not conn:
+      backend_open()
+    conn.send({'command': 'PING'})
+    print('Awaiting reply from backend for PING')
+    ready = select.select([conn], [], [], RECV_TIMEOUT)
+    if ready[0]:
+      response = conn.recv()
+    else:
+      return False
+    print('Got response.')
+    print response
+    if response['status'] == 'FAIL' and response['value'] == 'Backend is initializing.':
+      conn.send({'command': 'CLOSE'})
+      conn.close()
+      conn = None
+      return True
+    else:
+      conn.send({'command': 'CLOSE'})
+      conn.close()
+      conn = None
+      return False
+  except:
+    print('Checking backend failed!')
+    return False
+
+def backend_open():
+  global conn
+  print( 'backend_open()')
   if not conn:
     print( 'Connecting to backend.')
     conn = Client(BACKEND_ADDRESS, family=BACKEND_CONNECTION_FAMILY, authkey=BACKEND_PASSWORD)
     #conn.settimeout(100)
 
-def w2v_close():
+def backend_close():
   global conn
-  print( 'w2v_close()')
+  print( 'backend_close()')
   if conn:
     try:
       conn.send({'command': 'CLOSE'})
@@ -66,14 +94,14 @@ def w2v_close():
       pass
     conn = None
 
-def w2v_carry_out(request):
+def backend_carry_out(request):
   global conn
   reconnect_count = 0
   while True:
     try:
       if not conn:
         print( 'No connection')
-        w2v_open()
+        backend_open()
         print( 'Connection established!')
       else:
         print( 'There is a connection')
@@ -112,15 +140,15 @@ def w2v_carry_out(request):
       #if reconnect_count >= 3:
 
 
-def w2v_get_representation(term):
-  rep = w2v_carry_out({'command': 'wordmodel', 'term': term})
+def backend_get_representation(term):
+  rep = backend_carry_out({'command': 'wordmodel', 'term': term})
   return rep
 
-def w2v_exit():
+def backend_exit():
   try:
     if not conn:
       print( 'No connection')
-      w2v_open()
+      backend_open()
       print( 'Connection established!')
     else:
       print( 'There is a connection')
@@ -128,7 +156,7 @@ def w2v_exit():
     conn.send({'command': 'EXIT_NOW'})
     conn.close()
     conn = None
-    #w2v_carry_out({'command': 'EXIT_NOW'})
+    #backend_carry_out({'command': 'EXIT_NOW'})
   except Exception,e:
     print('Connection error. Check for ghost processes.')
 

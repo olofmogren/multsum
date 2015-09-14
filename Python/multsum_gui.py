@@ -26,15 +26,17 @@
  # along with this program.  If not, see <http://www.gnu.org/licenses/>.
  #
 
-import time, BaseHTTPServer, urlparse, webbrowser, threading, sys, re
+import time, urlparse, webbrowser, threading, sys, re
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from multiprocessing import Process
 from threading import Thread
 import multsum, backend_worker, backend_client
 
 
 
-HOST_NAME        = '' # !!!REMEMBER TO CHANGE THIS!!!
-PORT_NUMBER      = 9191 # Maybe set this to 9000.
+HOST_NAME         = ''
+PORT_NUMBER_FIRST = 9291
+PORT_NUMBER_LAST  = 9299
 
 use_w2v_similarity = True
 show_exit_button   = False
@@ -340,17 +342,17 @@ class MyHandler(BaseHTTPRequestHandler):
       s.wfile.write('''<html><head><title>404: Page not found.</title></head><body><h1>404: Page not found</h1></body></html>
       ''')
 
-def run_server(arg):
+def run_server(port_number=PORT_NUMBER_FIRST):
   server_class = ThreadedHTTPServer
-  httpd = server_class((HOST_NAME, PORT_NUMBER), MyHandler)
+  httpd = server_class((HOST_NAME, port_number), MyHandler)
     
-  print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
+  print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, port_number)
   try:
     httpd.serve_forever()
   except KeyboardInterrupt:
     pass
   httpd.server_close()
-  print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, PORT_NUMBER)
+  print time.asctime(), "Server Stops - %s:%s" % (HOST_NAME, port_number)
 
 
 def run_browser():
@@ -371,7 +373,7 @@ def run_browser():
   #self.webview.show()
   #scrolled_window.show()
   win.show_all()
-  webview.load_uri('http://localhost:%s/'%(str(PORT_NUMBER)))
+  webview.load_uri('http://localhost:%s/'%(str(port_number)))
   win.resize(1000, 800)
 
   #browser = Browser()
@@ -404,12 +406,18 @@ if __name__ == '__main__':
 
   #p_model = Process(target=init_model)
   #p_model.start()
-  p = Process(target=run_server, args=('bob',))
-  p.start()
+  for port_number in range(PORT_NUMBER_FIRST,PORT_NUMBER_LAST):
+    try:
+      p = Process(target=run_server, kwargs={'port_number': port_number})
+      p.start()
+      break
+    except socket.error, e:
+      print('Failed to start http server at port %d.'%(port_number))
+
   backend_started = False
   if use_w2v_similarity:
     if not backend_client.backend_check() and not backend_client.backend_is_initializing():
-      p_backend = Process(target=w2v_worker.run_backend, args={'capabilities': backend_worker.CAPABILITIES_W2V_ONLY, 'w2v_vector_file': w2v_vector_file})
+      p_backend = Process(target=backend_worker.run_backend, args={'w2v_vector_file': w2v_vector_file})
       p_backend.start()
       backend_started = True
   if launch_browser:
@@ -426,11 +434,11 @@ if __name__ == '__main__':
     except:
       print 'Failed internal browser. Will try to launch system broswer.'
       try:
-        webbrowser.open('http://localhost:%s/'%(str(PORT_NUMBER)))
+        webbrowser.open('http://localhost:%d/'%(port_number))
       except:
-        print 'Failed to start web interface. Start a broswer, and point it to http://localhost:9191/.'
+        print 'Failed to start web interface. Start a broswer, and point it to http://localhost:%d/.'%(port_number)
   else:
-    print 'Open a browser and point it to http://localhost:9191/.'
+    print 'Open a browser and point it to http://localhost:%d/.'%(port_number)
   
   print('Waiting web server to finish.')
   p.join()

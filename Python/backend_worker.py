@@ -4,7 +4,7 @@
 import sys, time, getopt, select, threading, socket
 
 from gensim.models import word2vec
-
+from multiprocessing import Process
 from multiprocessing.connection import Listener, Client
 from array import array
 
@@ -35,28 +35,62 @@ def init(w2v_vector_file=W2V_VECTOR_FILE):
   sys.stdout.flush()
 
 
-def run_backend(replace=False, exit=False, w2v_vector_file=W2V_VECTOR_FILE):
-  init(w2v_vector_file=w2v_vector_file)
+def run_backend(replace=False, exit=False, w2v_vector_file=W2V_VECTOR_FILE, temp_startup_server=False):
   repr_req_count = 0
 
-  if replace or exit:
-    try:
-      print( 'Trying to replace a running backend.')
-      print( 'Connecting to backend.')
-      sys.stdout.flush()
-      conn = Client(BACKEND_ADDRESS, family=BACKEND_CONNECTION_FAMILY, authkey=BACKEND_PASSWORD)
-      conn.send({'command': 'EXIT_NOW'})
-      conn.close()
-      conn = None
-      if not exit:
-        print( 'Waiting 30 secs for old backend to clean up.')
-        time.sleep(30)
-    except:
-      print( 'Did not manage to find a backend to kill.')
+  send_exit_command_after_init = False
 
-  if exit:
-    print('Exiting.')
-    sys.exit()
+  if not temp_startup_server:
+    try:
+      print('Connecting to backend.')
+      conn = Client(BACKEND_ADDRESS, family=BACKEND_CONNECTION_FAMILY, authkey=BACKEND_PASSWORD)
+      if not replace and not exit:
+        conn.send({'command': 'CAPABILITIES'})
+        msg = conn.recv()
+        if msg['status'] == 'OK' and (msg['value'] == 'FULL' or msg['value'] == 'W2V_ONLY'):
+          print('There is already an existing daemon with all neccessary capacities. Exiting.')
+          sys.exit()
+        else:
+          print msg
+          print('Found a running backend without required capabilities. Telling it to exit after init.')
+          send_exit_command_after_init = True
+      else: 
+        print('Found a running backend. Telling it to exit after init.')
+        send_exit_command_after_init = True
+    except Exception, e:
+      print(str(e))
+      print(str(traceback.format_exc()))
+      print('Did not manage to find a backend to kill.')
+
+    if exit:
+      print('Exiting.')
+      sys.exit()
+
+    if not send_exit_command_after_init:
+      # The temp_startup_serer will take care of requests until startup (init()) is complete.
+      p = Process(target=run_backend, kwargs={'temp_startup_server': True})
+      p.start()
+    
+    init(w2v_vector_file=w2v_vector_file)
+    
+    # either temp_startup_server backend, or a previously running backend.
+    print('Connecting to temp_startup_server (or previously running) backend.')
+    conn = Client(BACKEND_ADDRESS, family=BACKEND_CONNECTION_FAMILY, authkey=BACKEND_PASSWORD)
+    conn.send({'command': 'EXIT_NOW'})
+    conn.close()
+    conn = None
+    if not send_exit_command_after_init:
+      print('Waiting 1 sec for temp_startup_server backend to clean up.')
+      time.sleep(1)
+    else:
+      print('Waiting 30 sec for previously running backend to clean up.')
+      time.sleep(30)
+      
+    if not send_exit_command_after_init:
+      p.terminate()
+      print('temp_startup_server backend is now terminated.')
+  else:
+    print('temp_startup_server running.')
 
   connections = {}
   epoll = select.epoll()
@@ -92,8 +126,12 @@ def run_backend(replace=False, exit=False, w2v_vector_file=W2V_VECTOR_FILE):
         else:
           conn = connections[fileno]
           msg = conn.recv()
-          # do something with msg
-          if msg['command'] == 'wordmodel':
+          if temp_startup_server and msg['command'] != 'EXIT_NOW' \
+                                 and msg['command'] != 'CLOSE' \
+                                 and msg['command'] != 'CAPABILITIES':
+            conn.send({'status': 'FAIL', 'value': 'Backend is initializing.'})
+            continue
+          elif msg['command'] == 'wordmodel':
             repr_req_count = repr_req_count+1
             if not wordmodel:
               conn.send({'status': 'FAIL', 'value': '\'Looking for term: '+msg['term']+'\': wordmodel does not seem to be inizialized. Was the vector file not found?'})
@@ -109,7 +147,7 @@ def run_backend(replace=False, exit=False, w2v_vector_file=W2V_VECTOR_FILE):
             else:
               conn.send({'status': 'OK', 'value': 'PONG'})
           elif msg['command'] == 'CAPABILITIES':
-            conn.send({'status': 'OK', 'value': 'WORDMODEL'})
+            conn.send({'status': 'OK', 'value': 'W2V_ONLY'})
           elif msg['command'] == 'CLOSE':
             epoll.unregister(conn.fileno())
             del connections[conn.fileno()]
@@ -133,7 +171,7 @@ def run_backend(replace=False, exit=False, w2v_vector_file=W2V_VECTOR_FILE):
               except:
                 pass
 
-            exit()
+            sys.exit()
             #return
           else:
             conn.send({'status': 'FAIL', 'value': 'Unknown command.'})
