@@ -5,7 +5,7 @@ import math, numpy, os.path, re, sys,time
 from stemming.porter2 import stem
 from multsum_clustering import *
 from analyze_sentiment import analyze_sentiment
-from w2v_client import *
+from backend_client import *
 
  # @author Olof Mogren
  #
@@ -580,7 +580,7 @@ def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAUL
     print('Computing sentence similarities based on word2vec.')
     if preloaded_w2v_wordmodel:
       wordmodel = preloaded_w2v_wordmodel
-    elif not w2v_client:
+    elif not w2v_backend:
       wordmodel = load_w2v_wordmodel(w2v_vector_file)
     if wordmodel or w2v_backend:
       w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
