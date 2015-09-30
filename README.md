@@ -51,6 +51,7 @@ java SubSum.java --matrix-file <filename1> [--matrix-file <filename2> [--matrix-
 
 Porter stemmer:
   > pip install stemming
+
 Gensim for reading pretrained word2vec vectors (optional):
   > pip install gensim
 
