@@ -1,7 +1,7 @@
 /**
  * 
  */
-package se.chalmers.mogren.submodularsummarization;
+package se.chalmers.mogren.multsum;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -20,8 +20,8 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
-import se.chalmers.mogren.submodularsummarization.util.KMeans;
-import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
+import se.chalmers.mogren.multsum.util.KMeans;
+import se.chalmers.mogren.multsum.util.PorterStemmer;
 
 /**
  * 
@@ -46,7 +46,7 @@ import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public abstract class SubSumBase
+public abstract class MultSumBase
 {
   public enum Flags {MOD_COST_WEIGHT,
     MOD_SINGLETON,

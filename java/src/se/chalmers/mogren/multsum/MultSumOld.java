@@ -1,4 +1,4 @@
-package se.chalmers.mogren.submodularsummarization;
+package se.chalmers.mogren.multsum;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -14,9 +14,9 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.TreeSet;
 
-import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
+import se.chalmers.mogren.multsum.util.PorterStemmer;
 
-public class SubSumOld extends SubSumBase
+public class MultSumOld extends MultSumBase
 {
   private static final String USAGE_STRING = "Usage: <command> --matrix-file <filename1> [--matrix-file <filename2> [--matrix-file <filename3> [...]]] \n" +
       "--document-file file \n" +
@@ -41,7 +41,7 @@ public class SubSumOld extends SubSumBase
 
   public static void main(String[] args)
   {
-    SubSumOld summary = null;
+    MultSumOld summary = null;
     double lambda = DEFAULT_LAMBDA;
     int summarySize = 2;
     LengthUnit lengthUnit = LengthUnit.SENTENCES;
@@ -113,16 +113,16 @@ public class SubSumOld extends SubSumBase
       if(sentences == null)
         System.err.println("WARNING! sentences list is null!");
 
-      summary = new SubSumOld(matrixFileNames.toArray(new String[matrixFileNames.size()]), sentences, lambda, summarySize, lengthUnit, new HashSet<Flags>());
+      summary = new MultSumOld(matrixFileNames.toArray(new String[matrixFileNames.size()]), sentences, lambda, summarySize, lengthUnit, new HashSet<Flags>());
     }
     else
     {
-      summary = new SubSumOld(stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, lengthUnit, new HashSet<Flags>());
+      summary = new MultSumOld(stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, lengthUnit, new HashSet<Flags>());
     }
 
     System.out.println(summary);
   }
-  public SubSumOld(String stopwordsFilename, String documentFileName, String wordClusterFileName, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
+  public MultSumOld(String stopwordsFilename, String documentFileName, String wordClusterFileName, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
   {
     if(lambda == null)
       lambda = DEFAULT_LAMBDA;
@@ -148,7 +148,7 @@ public class SubSumOld extends SubSumBase
     selectSentences(summarySize, sentenceMeasures.similarities, lambda, clusterings, K, sentences, lengthUnit, flags);
   }
 
-  public SubSumOld(String[] matrixFileNames, ArrayList<String> sentences, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
+  public MultSumOld(String[] matrixFileNames, ArrayList<String> sentences, Double lambda, int summarySize, LengthUnit lengthUnit, Collection<Flags> flags)
   {
     if(lambda == null)
       lambda = DEFAULT_LAMBDA;

@@ -1,4 +1,4 @@
-package se.chalmers.mogren.submodularsummarization.util;
+package se.chalmers.mogren.multsum.util;
 
 /*
 

@@ -1,4 +1,4 @@
-package se.chalmers.mogren.submodularsummarization;
+package se.chalmers.mogren.multsum;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -20,7 +20,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import se.chalmers.mogren.mklsum.NSMKLSum;
-import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
+import se.chalmers.mogren.multsum.util.PorterStemmer;
 
 /**
  * 
@@ -51,7 +51,7 @@ import se.chalmers.mogren.submodularsummarization.util.PorterStemmer;
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-public class SubSum extends SubSumBase
+public class MultSum extends MultSumBase
 {
   private static final String USAGE_STRING = "Usage: <command> --matrix-file <filename1> [--matrix-file <filename2> [--matrix-file <filename3> [...]]] \n" +
       "--document-file file-or-directory \n" +
@@ -86,12 +86,12 @@ public class SubSum extends SubSumBase
 
     String flagString = 
         "[--flag ";
-    for(SubSum.Flags flag: SubSum.Flags.values())
+    for(MultSum.Flags flag: MultSum.Flags.values())
       flagString += flag.toString()+"|";
     flagString = flagString.substring(0, flagString.length()-1);
     flagString += " ] \n";
 
-    SubSum summary = null;
+    MultSum summary = null;
     double lambda = DEFAULT_LAMBDA;
     int summarySize = 2;
     LengthUnit summarySizeUnit = LengthUnit.SENTENCES;
@@ -208,11 +208,11 @@ public class SubSum extends SubSumBase
         System.err.println("WARNING! sentences list is null!");
 
       HashMap<String, Double> nullIdfs = null;
-      summary = new SubSum(matrixFileNames, null, sentences, null, null, null, lambda, summarySize, summarySizeUnit, flags, nullIdfs, null);
+      summary = new MultSum(matrixFileNames, null, sentences, null, null, null, lambda, summarySize, summarySizeUnit, flags, nullIdfs, null);
     }
     else
     {
-      summary = new SubSum(null, null, null, stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, summarySizeUnit, flags, idfs, null);
+      summary = new MultSum(null, null, null, stopwordsFilename, documentFileName, wordClusterFileName, lambda, summarySize, summarySizeUnit, flags, idfs, null);
     }
 
     if(printAsText)
@@ -221,7 +221,7 @@ public class SubSum extends SubSumBase
     System.out.println(summary);
 
   }
-  public SubSum(List<String> matrixFileNames,
+  public MultSum(List<String> matrixFileNames,
       String weightFile,
       List<String> sentences,
       String stopwordsFilename,
@@ -292,7 +292,7 @@ public class SubSum extends SubSumBase
    *                            getIdfsFromDocCollection(sentencesLists, stopwordsFilename, wordClusterFileName)
    *
    */
-  public SubSum(List<String> matrixFileNames,
+  public MultSum(List<String> matrixFileNames,
       String matrixWeightFile,
       List<String> sentences,
       String stopwordsFilename,
