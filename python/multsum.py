@@ -61,7 +61,7 @@ Some of the options below can also be used with the GUI for MULTSUM, multsum_gui
 
 1. To summarize a set of documents, run:
 
-   'python multsum.py inputfile1 inputfile2 ...'
+   'python multsum.py [options] inputfile1 inputfile2 ...'
 
    Unless other things are specified with options, input files are assumed to be
    text files with one sentence per line. Documents will be summarized with a
@@ -99,7 +99,7 @@ Some of the options below can also be used with the GUI for MULTSUM, multsum_gui
 Global Options:
 
    --summary-length <len>: Set summary length. (Default is 300 words).
-   --sumary-length-unit WORDS|CHARACTERS|SENTENCES: Set summary length unit (Default is WORDS).
+   --summary-length-unit WORDS|CHARACTERS|SENTENCES: Set summary length unit (Default is WORDS).
 
 For questions, please contact olof@mogren.one.
 
@@ -163,7 +163,7 @@ def getMultipliedAggregateSimilarities(ms):
 
   return aggregateSim
 
-def getSentencesAsBags(stopwords, sentencesLists):
+def get_sentences_as_bags(stopwords, sentencesLists):
   sentenceBagList = list()
 
   for sentences in sentencesLists:
@@ -247,7 +247,7 @@ def summary_is_too_long(selected, sentencesLists, lengthUnit, summarySize):
 def get_def_sentsims(sentencesLists, stopwordsFilename, idfs):
   stopwords = get_stopwords(stopwordsFilename) #set
 
-  sentencesBags = getSentencesAsBags(stopwords, sentencesLists) #list of dicts, from word to wordcount
+  sentencesBags = get_sentences_as_bags(stopwords, sentencesLists) #list of dicts, from word to wordcount
   #print(sentencesBags)
 
   vocabulary_s = set() #list of strings
@@ -269,7 +269,7 @@ def get_def_sentsims(sentencesLists, stopwordsFilename, idfs):
 
   if not idfs:
       # The following is what lin-bilmes did, if sentencesLists contains each document in a cluster.
-    idfs = getIdfsFromDocCollection(sentencesLists, stopwordsFilename)
+    idfs = get_idfs_from_doc_collection(sentencesLists, stopwordsFilename)
   #print(idfs)
   
   # Denominators for the cosine similarity computation: #/
@@ -424,7 +424,7 @@ def select_sentences(summarySize,
    # 
    #/
 
-def getIdfsFromDocCollection(documentCluster, stopwordsFilename):
+def get_idfs_from_doc_collection(documentCluster, stopwordsFilename):
   documentCountsForTerm = dict() # dictfrom string to integer
   stopwords = get_stopwords(stopwordsFilename)
 
@@ -531,19 +531,19 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwords=DEFAULT_S
       print(i+1) #one-based output, not zero-based.
   return return_string
 
-def get_sentence_rep(sentence, wordmodel, w2v_backend):
+def get_sentence_embedding(sentence, wordmodel, w2v_backend):
   words = re.split('\W+', sentence)
-  sentence_rep = 0.0
+  sentence_embedding = 0.0
   count = 0.0
   for w in words:
-    wordrep = get_word_rep(w, wordmodel, w2v_backend)
+    wordrep = get_word_embedding(w, wordmodel, w2v_backend)
     if wordrep:
-      sentence_rep += wordrep
+      sentence_embedding += wordrep
       count = count + 1.0
 
-  return numpy.divide(sentence_rep, count)
+  return numpy.divide(sentence_embedding, count)
 
-def get_word_rep(word, wordmodel, w2v_backend):
+def get_word_embedding(word, wordmodel, w2v_backend):
   wordrep = None
   if wordmodel and w in wordmodel:
     wordrep = wordmodel[w]
@@ -551,44 +551,73 @@ def get_word_rep(word, wordmodel, w2v_backend):
     wordrep = w2v_get_representation(w)
   return wordrep
 
-def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, w2v_experiments="")
+def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, w2v_experiments=""):
   w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
   if w2v_experiments=="":
     for i in range(0, len(flat_sentences)):
-      sentence_rep_i = get_sentence_rep(flat_sentences[i], wordmodel, w2v_backend)
+      sentence_embedding_i = get_sentence_embedding(flat_sentences[i], wordmodel, w2v_backend)
       for j in range(i, len(flat_sentences)):
-        sentence_rep_j = get_sentence_rep(flat_sentences[j], wordmodel, w2v_backend)
-        w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_rep_i, sentence_rep_j)/numpy.sqrt(numpy.dot(sentence_rep_i, sentence_rep_i))+numpy.sqrt(numpy.dot(sentence_rep_j, sentence_rep_j))+1)
+        sentence_embedding_j = get_sentence_embedding(flat_sentences[j], wordmodel, w2v_backend)
+        w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_embedding_i, sentence_embedding_j)/numpy.sqrt(numpy.dot(sentence_embedding_i, sentence_embedding_i))+numpy.sqrt(numpy.dot(sentence_embedding_j, sentence_embedding_j))+1)
         w2v_matrix[j][i] = w2v_matrix[i][j]
   elif w2v_experiments=="TOP5":
     for i in range(0, len(flat_sentences)):
       for j in range(i, len(flat_sentences)):
         words_i = re.split('\W+', flat_sentences[i])
-        avg_top5s = []
+        scores = []
         for word_i in words_i:
-          word_rep_i = get_word_rep(word_i, wordmodel, w2v_backend)
-          top5_i = []
+          word_embedding_i = get_word_embedding(word_i, wordmodel, w2v_backend)
           words_j = re.split('\W+', flat_sentences[j])
           for word_j in words_j:
-            word_rep_j = get_word_rep(word_j, wordmodel, w2v_backend)
-            similarity = 0.5 * (numpy.dot(word_rep_i, word_rep_j)/numpy.sqrt(numpy.dot(word_rep_i, word_rep_i))+numpy.sqrt(numpy.dot(word_rep_j, word_rep_j))+1)
-            if len(top5_i) < 5:
-              top5_i.append(similarity)
-            else:
-              for k in range(0,len(top5_i)):
-                if top5_i[k] < similarity:
-                  top5_i[k] = similarity
-          avg_top5_i = 0.0
-          for k in range(0,len(top5_i)):
-            avg_top5_i = avg_top5_i + top5_i[k]
-          avg_top5_i /= len(top5_i)
-          avg_top5s.append(avg_top5_i)
-        top5_top5s = sorted(avg_top5s)[-5:]
-        avg_top5_top5s = 0.0
-        for k in range(0,len(top5_top5s)):
-          avg_top5_top5s = avg_top5_top5s + top5_top5s[k]
-        avg_top5_top5s /= len(top5_top5s)
-        w2v_matrix[i][j] = avg_top5_top5s
+            word_embedding_j = get_word_embedding(word_j, wordmodel, w2v_backend)
+            similarity = 0.5 * (numpy.dot(word_embedding_i, word_embedding_j)/numpy.sqrt(numpy.dot(word_embedding_i, word_embedding_i))+numpy.sqrt(numpy.dot(word_embedding_j, word_embedding_j))+1)
+            scores.append(similarity)
+        sentence_sim = 0.0
+        scores = sorted(scores, reverse=True)
+        for k in range(0,min(len(scores),5)):
+          sentence_sim += scores[k]
+        sentence_sim /= len(scores)
+        w2v_matrix[i][j] = sentence_sim
+        w2v_matrix[j][i] = w2v_matrix[i][j]
+  elif w2v_experiments=="ALL":
+    for i in range(0, len(flat_sentences)):
+      for j in range(i, len(flat_sentences)):
+        words_i = re.split('\W+', flat_sentences[i])
+        scores = []
+        for word_i in words_i:
+          word_embedding_i = get_word_embedding(word_i, wordmodel, w2v_backend)
+          words_j = re.split('\W+', flat_sentences[j])
+          for word_j in words_j:
+            word_embedding_j = get_word_embedding(word_j, wordmodel, w2v_backend)
+            similarity = 0.5 * (numpy.dot(word_embedding_i, word_embedding_j)/numpy.sqrt(numpy.dot(word_embedding_i, word_embedding_i))+numpy.sqrt(numpy.dot(word_embedding_j, word_embedding_j))+1)
+            scores.append(similarity)
+        sentence_sim = 0.0
+        for k in range(0,len(scores)):
+          sentence_sim += scores[k]
+        sentence_sim /= len(scores)
+        w2v_matrix[i][j] = sentence_sim
+        w2v_matrix[j][i] = w2v_matrix[i][j]
+  elif w2v_experiments=="TFIDF":
+    sentencesBags = get_sentences_as_bags(stopwords, sentencesLists) #list of dicts, from word to wordcount
+    idfs = get_idfs_from_doc_collection(sentencesLists, stopwordsFilename)
+    for i in range(0, len(flat_sentences)):
+      for j in range(i, len(flat_sentences)):
+        words_i = re.split('\W+', flat_sentences[i])
+        scores = []
+        for word_i in words_i:
+          tfidf_i = sentencesBags[i][word_i]*idfs[word_i]
+          word_embedding_i = tfidf_i*get_word_embedding(word_i, wordmodel, w2v_backend)
+          words_j = re.split('\W+', flat_sentences[j])
+          for word_j in words_j:
+            tfidf_j = sentencesBags[j][word_j]*idfs[word_j]
+            word_embedding_j = tfidf_j*get_word_embedding(word_j, wordmodel, w2v_backend)
+            similarity = 0.5 * (numpy.dot(word_embedding_i, word_embedding_j)/numpy.sqrt(numpy.dot(word_embedding_i, word_embedding_i))+numpy.sqrt(numpy.dot(word_embedding_j, word_embedding_j))+1)
+            scores.append(similarity)
+        sentence_sim = 0.0
+        for k in range(0,len(scores)):
+          sentence_sim += scores[k]
+        sentence_sim /= len(scores)
+        w2v_matrix[i][j] = sentence_sim
         w2v_matrix[j][i] = w2v_matrix[i][j]
   else:
     print "Unknown w2v_experiment: \""+w2v_experiments+"\"."
@@ -735,10 +764,10 @@ def main():
       use_sentiment_similarity = False
     elif sys.argv[i] == '--no-w2v':
       use_w2v_similarity = False
-    elif sys.argv[i] == '--sumary-length':
+    elif sys.argv[i] == '--summary-length':
       summary_length = sys.argv[i+1]
       skip = True
-    elif sys.argv[i] == '--sumary-length-unit':
+    elif sys.argv[i] == '--summary-length-unit':
       summary_length_unit = LENGTH_UNITS[sys.argv[i+1]]
       skip = True
     elif sys.argv[i] == '--w2v-file':
