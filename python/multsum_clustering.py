@@ -29,9 +29,9 @@ from subprocess import call
  # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-#CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/scluster"
+#CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/sync/code/others_code/cluto/scluster"
 
-#CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/vcluster"
+#CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/sync/code/others_code/cluto/vcluster"
 CLUTO_VCLUSTER_EXECUTABLE = None
 
 DEFAULT_STOPWORDS = 'english_stopwords.txt'

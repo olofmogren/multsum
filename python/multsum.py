@@ -82,6 +82,10 @@ Some of the options below can also be used with the GUI for MULTSUM, multsum_gui
                         Pretrained vectors can be downloaded from http://code.google.com/p/word2vec/ .
                         (This option is available in multsum_gui.py).
      --w2v-backend:     Try to connect to running backend providing word vectors. See w2v_worker.py.
+     --w2v-experiments <experiment-tag>:
+                        Run experimental versions of the w2v sentence similarity measure.
+                        experiment-tag is one of:
+                        TOP5 - using the average of the top 5 scoring word-similarities between the two sentences.
 
 2. To use the sentence selection with user specified similarity matrices, run:
 
@@ -532,21 +536,66 @@ def get_sentence_rep(sentence, wordmodel, w2v_backend):
   sentence_rep = 0.0
   count = 0.0
   for w in words:
-    if wordmodel:
-      wordrep = None
-      if w in wordmodel:
-        wordrep = wordmodel[w]
-      elif w2v_backend:
-        wordrep = w2v_get_representation(w)
-
-      if wordrep:
-        sentence_rep += wordrep
-        count = count + 1.0
+    wordrep = get_word_rep(w, wordmodel, w2v_backend)
+    if wordrep:
+      sentence_rep += wordrep
+      count = count + 1.0
 
   return numpy.divide(sentence_rep, count)
 
+def get_word_rep(word, wordmodel, w2v_backend):
+  wordrep = None
+  if wordmodel and w in wordmodel:
+    wordrep = wordmodel[w]
+  elif w2v_backend:
+    wordrep = w2v_get_representation(w)
+  return wordrep
 
-def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False, preloaded_w2v_wordmodel=None, w2v_backend=False):
+def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, w2v_experiments="")
+  w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
+  if w2v_experiments=="":
+    for i in range(0, len(flat_sentences)):
+      sentence_rep_i = get_sentence_rep(flat_sentences[i], wordmodel, w2v_backend)
+      for j in range(i, len(flat_sentences)):
+        sentence_rep_j = get_sentence_rep(flat_sentences[j], wordmodel, w2v_backend)
+        w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_rep_i, sentence_rep_j)/numpy.sqrt(numpy.dot(sentence_rep_i, sentence_rep_i))+numpy.sqrt(numpy.dot(sentence_rep_j, sentence_rep_j))+1)
+        w2v_matrix[j][i] = w2v_matrix[i][j]
+  elif w2v_experiments=="TOP5":
+    for i in range(0, len(flat_sentences)):
+      for j in range(i, len(flat_sentences)):
+        words_i = re.split('\W+', flat_sentences[i])
+        avg_top5s = []
+        for word_i in words_i:
+          word_rep_i = get_word_rep(word_i, wordmodel, w2v_backend)
+          top5_i = []
+          words_j = re.split('\W+', flat_sentences[j])
+          for word_j in words_j:
+            word_rep_j = get_word_rep(word_j, wordmodel, w2v_backend)
+            similarity = 0.5 * (numpy.dot(word_rep_i, word_rep_j)/numpy.sqrt(numpy.dot(word_rep_i, word_rep_i))+numpy.sqrt(numpy.dot(word_rep_j, word_rep_j))+1)
+            if len(top5_i) < 5:
+              top5_i.append(similarity)
+            else:
+              for k in range(0,len(top5_i)):
+                if top5_i[k] < similarity:
+                  top5_i[k] = similarity
+          avg_top5_i = 0.0
+          for k in range(0,len(top5_i)):
+            avg_top5_i = avg_top5_i + top5_i[k]
+          avg_top5_i /= len(top5_i)
+          avg_top5s.append(avg_top5_i)
+        top5_top5s = sorted(avg_top5s)[-5:]
+        avg_top5_top5s = 0.0
+        for k in range(0,len(top5_top5s)):
+          avg_top5_top5s = avg_top5_top5s + top5_top5s[k]
+        avg_top5_top5s /= len(top5_top5s)
+        w2v_matrix[i][j] = avg_top5_top5s
+        w2v_matrix[j][i] = w2v_matrix[i][j]
+  else:
+    print "Unknown w2v_experiment: \""+w2v_experiments+"\"."
+    return None
+  return w2v_matrix
+
+def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments=""):
 
   print 'summarize_strings()'
   #for l in sentencesLists:
@@ -583,14 +632,9 @@ def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAUL
     elif not w2v_backend:
       wordmodel = load_w2v_wordmodel(w2v_vector_file)
     if wordmodel or w2v_backend:
-      w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
-      for i in range(0, len(flat_sentences)):
-        sentence_rep_i = get_sentence_rep(flat_sentences[i], wordmodel, w2v_backend)
-        for j in range(i, len(flat_sentences)):
-          sentence_rep_j = get_sentence_rep(flat_sentences[j], wordmodel, w2v_backend)
-          w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_rep_i, sentence_rep_j)/numpy.sqrt(numpy.dot(sentence_rep_i, sentence_rep_i))+numpy.sqrt(numpy.dot(sentence_rep_j, sentence_rep_j))+1)
-          w2v_matrix[j][i] = w2v_matrix[i][j]
-      matrices.append(w2v_matrix)
+      w2v_matrix = get_w2v_matrix(flat_sentences, wormodel, w2v_backend, w2v_experiments)
+      if w2v_matrix != None:
+        matrices.append(w2v_matrix)
   if use_tfidf_similarity or len(matrices) == 0:
     # this is also used for fallback if the others were specified and failed for some reason.
     matrices.append(sentsims["tfidf_cosine"])
@@ -624,7 +668,7 @@ def summarize_strings(sentencesLists, stopwords=DEFAULT_STOPWORDS, length=DEFAUL
   return return_string
  
 
-def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False):
+def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments=""):
   sentencesLists = list()
   for filename in document_names:
     f = open(filename, 'r')
@@ -634,7 +678,7 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
         sentences.append(line)
     sentencesLists.append(sentences)
   
-  return summarize_strings(sentencesLists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend)
+  return summarize_strings(sentencesLists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments)
 
 def load_w2v_wordmodel(w2v_vector_file=W2V_VECTOR_FILE):
   if not os.path.isfile(w2v_vector_file):
@@ -673,6 +717,7 @@ def main():
 
   w2v_vector_file = W2V_VECTOR_FILE
   w2v_backend = False
+  w2v_experiments = ""
 
   for i in range(1,len(sys.argv)):
     if skip:
@@ -701,6 +746,9 @@ def main():
       skip = True
     elif sys.argv[i] == '--w2v-backend':
       w2v_backend = True
+    elif sys.argv[i] == '--w2v-experiments':
+      w2v_experiments = sys.argv[i+1]
+      skip = True
     elif sys.argv[i] == '--s':
       # matrix files
       sentences_file = sys.argv[i+1]
@@ -712,7 +760,7 @@ def main():
     if not use_tfidf_similarity and not use_sentiment_similarity and not use_w2v_similarity:
       print 'Using default LinTFIDF similarity measure, since no other was provided.'
       use_tfidf_similarity = True
-    summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend)
+    summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments)
   else:
     summarize_matrix_files(files, sentences_file)
 

@@ -73,8 +73,8 @@ public abstract class MultSumBase
   public static final String REGEX_SPACE_COMMA   = "\\s+|,";
   public static final String REGEX_NONWORD       = "[^\\p{L}\\p{Nd}]+";
 
-  public static final String CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/scluster";
-  public static final String CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/Syncthing/Code/others_code/cluto/vcluster";
+  public static final String CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/sync/code/others_code/cluto/scluster";
+  public static final String CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/sync/code/others_code/cluto/vcluster";
 
   protected double L1(HashSet<Integer> S, double[][] w, Double alpha, Double a)
   {
