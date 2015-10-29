@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import se.chalmers.mogren.mklsum.NSMKLSum;
+//import se.chalmers.mogren.mklsum.NSMKLSum;
 import se.chalmers.mogren.multsum.util.PorterStemmer;
 
 /**
@@ -570,13 +570,13 @@ public class MultSum extends MultSumBase
     int K = getK(matrices[0].distances.length);
 
     LinkedList<int[]> clusterings = new LinkedList<int[]>();
-    if(flags.contains(Flags.MOD_NSMKL_CLUSTERING))
-    {
-      ArrayList<double[][]> simMatrices = new ArrayList<double[][]>();
-      for(DocMatrices dms: matrices)
-        simMatrices.add(dms.similarities);
-      clusterings.add(NSMKLSum.clusterMatrices(simMatrices));
-    }
+//    if(flags.contains(Flags.MOD_NSMKL_CLUSTERING))
+//    {
+//      ArrayList<double[][]> simMatrices = new ArrayList<double[][]>();
+//      for(DocMatrices dms: matrices)
+//        simMatrices.add(dms.similarities);
+//      clusterings.add(NSMKLSum.clusterMatrices(simMatrices));
+//    }
     if(sentenceVectorsForClustering != null)
     {
       System.out.println(new Date()+": Clustering specified sentence vectors!");
