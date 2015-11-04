@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import math, numpy, os.path, re, sys,time
+import multsum_preprocess
 from stemming.porter2 import stem
 from multsum_clustering import *
 from analyze_sentiment import analyze_sentiment
@@ -547,13 +548,13 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=D
       print(i+1) #one-based output, not zero-based.
   return return_string
 
-def get_sentence_embedding(sentence, wordmodel, w2v_backend, quiet=False):
+def get_sentence_embedding_avg(sentence, wordmodel, w2v_backend, quiet=False):
   words = re.split(REGEX_SPACE, sentence.lower())
   sentence_embedding = 0.0
   count = 0.0
   for w in words:
     wordrep = get_word_embedding(w, wordmodel, w2v_backend, quiet=quiet)
-    if wordrep:
+    if wordrep is not None:
       sentence_embedding += wordrep
       count = count + 1.0
 
@@ -577,17 +578,17 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, sentences_
   argmax_j = 0
   if w2v_experiments=="":
     for i in range(0, len(flat_sentences)):
-      sentence_embedding_i = get_sentence_embedding(flat_sentences[i], wordmodel, w2v_backend, quiet=quiet)
+      sentence_embedding_i = get_sentence_embedding_avg(flat_sentences[i], wordmodel, w2v_backend, quiet=quiet)
       for j in range(i, len(flat_sentences)):
-        sentence_embedding_j = get_sentence_embedding(flat_sentences[j], wordmodel, w2v_backend, quiet=quiet)
+        sentence_embedding_j = get_sentence_embedding_avg(flat_sentences[j], wordmodel, w2v_backend, quiet=quiet)
         w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_embedding_i, sentence_embedding_j)/numpy.sqrt(numpy.dot(sentence_embedding_i, sentence_embedding_i))*numpy.sqrt(numpy.dot(sentence_embedding_j, sentence_embedding_j))+1)
         w2v_matrix[j][i] = w2v_matrix[i][j]
-        if sentence_sim < minval:
-          minval = sentence_sim
+        if w2v_matrix[i][j] < minval:
+          minval = w2v_matrix[i][j]
           argmin_i = i
           argmin_j = j
-        if sentence_sim > maxval:
-          maxval = sentence_sim
+        if w2v_matrix[i][j] > maxval:
+          maxval = w2v_matrix[i][j]
           argmax_i = i
           argmax_j = j
   else:
@@ -653,7 +654,9 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, sentences_
           #print scores[k]
           sentence_sim += scores[k]
           #print sentence_sim
-        sentence_sim /= float(len(scores))
+        if len(scores) > 0:
+          #divide-by-zero check. If zero, also sentence_sim will be zero
+          sentence_sim /= float(len(scores))
         #print "%d,%d: %f"%(i,j,sentence_sim)
         w2v_matrix[i][j] = sentence_sim
         w2v_matrix[j][i] = w2v_matrix[i][j]
@@ -690,7 +693,7 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, sentences_
   
   return w2v_matrix
 
-def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False):
+def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False):
 
   # print 'summarize_strings()'
   #for l in sentences_lists:
@@ -712,6 +715,8 @@ def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, leng
             #print s
       splittedLists.append(splittedList)
     sentences_lists = splittedLists
+
+  sentences_lists = multsum_preprocess.preprocess(sentences_lists, anaphora_resolution_simple=anaphora_resolution_simple)
   
   sentsims = get_def_sentsims(sentences_lists, stopwordsFilename, None)
 
@@ -775,7 +780,7 @@ def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, leng
   return return_string
  
 
-def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False):
+def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False):
   sentences_lists = list()
   for filename in document_names:
     f = open(filename, 'r')
@@ -784,8 +789,9 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
       if line:
         sentences.append(line)
     sentences_lists.append(sentences)
+
   
-  return summarize_strings(sentences_lists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering)
+  return summarize_strings(sentences_lists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple)
 
 def load_w2v_wordmodel(w2v_vector_file=W2V_VECTOR_FILE):
   if not os.path.isfile(w2v_vector_file):
@@ -831,6 +837,8 @@ def main():
   quiet = False
   output_numbers = False
 
+  anaphora_resolution_simple = False
+  
   for i in range(1,len(sys.argv)):
     if skip:
       skip = False
@@ -841,6 +849,8 @@ def main():
       doc_files = False
     elif sys.argv[i] == '--split':
       split_sentences = True
+    elif sys.argv[i] == '--anaphora-resolution-simple':
+      anaphora_resolution_simple = True
     elif sys.argv[i] == '--no-tfidf':
       use_tfidf_similarity = False
     elif sys.argv[i] == '--no-sentiment':
@@ -876,7 +886,8 @@ def main():
       sentences_file = sys.argv[i+1]
       skip = True
     else:
-      files.append(sys.argv[i])
+      if sys.argv[i] != "":
+        files.append(sys.argv[i])
   if not quiet:
     print WELCOME_MESSAGE
     print "summary_length: %s"%summary_length
@@ -888,7 +899,7 @@ def main():
       if not quiet:
         print 'Using default LinTFIDF similarity measure, since no other was provided.'
       use_tfidf_similarity = True
-    summary = summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering)
+    summary = summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple)
     print summary
   else:
     summary = summarize_matrix_files(files, sentences_file)
