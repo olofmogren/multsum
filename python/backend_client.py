@@ -23,7 +23,7 @@ def backend_check(recv_timeout=RECV_TIMEOUT, quiet=False):
   global conn
   try:
     if not conn:
-      backend_open()
+      backend_open(quiet=quiet)
     conn.send({'command': 'PING'})
     if not quiet:
       print( 'Awaiting reply from backend for PING')
@@ -55,7 +55,7 @@ def backend_is_initializing(quiet=False):
   global conn
   try:
     if not conn:
-      backend_open()
+      backend_open(quiet=quiet)
     conn.send({'command': 'PING'})
     if not quiet:
       print('Awaiting reply from backend for PING')
@@ -112,7 +112,7 @@ def backend_carry_out(request, quiet=False):
       if not conn:
         if not quiet:
           print( 'No connection')
-        backend_open()
+        backend_open(quiet=quiet)
         if not quiet:
           print( 'Connection established!')
       #else:
@@ -159,7 +159,7 @@ def backend_carry_out(request, quiet=False):
 
 
 def backend_get_representation(term, quiet=False):
-  rep = backend_carry_out({'command': 'wordmodel', 'term': term})
+  rep = backend_carry_out({'command': 'wordmodel', 'term': term}, quiet=quiet)
   return rep
 
 def backend_exit(quiet=False):
@@ -167,7 +167,7 @@ def backend_exit(quiet=False):
     if not conn:
       if not quiet:
         print( 'No connection')
-      backend_open()
+      backend_open(quiet=quiet)
       if not quiet:
         print( 'Connection established!')
     else:

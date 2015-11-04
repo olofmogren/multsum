@@ -228,31 +228,31 @@ def get_sentence_index(i, sentences_lists):
       searchedLines += len(l)
   return None
 
-def charactersLength(selected, sentences_lists):
+def characters_length(selected, sentences_lists):
   chars = 0
   for i in selected:
     chars += len(get_sentence_index(i, sentences_lists))
   return chars
 
-def wordsLength(selected, sentences_lists):
+def words_length(selected, sentences_lists):
   words = 0
   for i in selected:
     words += len(get_sentence_index(i, sentences_lists).split())
-    #words += len(re.split(REGEX_NONWORD, get_sentence_index(i, sentences_lists)))
   return words
 
 def summary_is_too_short(selected, sentences_lists, lengthUnit, summarySize):
   if lengthUnit == UNIT_CHARACTERS:
-    return charactersLength(selected, sentences_lists) < summarySize
+    return characters_length(selected, sentences_lists) < summarySize
   elif lengthUnit == UNIT_WORDS:
-    return wordsLength(selected, sentences_lists) < summarySize
+    return words_length(selected, sentences_lists) < summarySize
   else:
     return len(selected) < summarySize
+
 def summary_is_too_long(selected, sentences_lists, lengthUnit, summarySize):
   if lengthUnit == UNIT_CHARACTERS:
-    return charactersLength(selected, sentences_lists) > summarySize
+    return characters_length(selected, sentences_lists) > summarySize
   elif lengthUnit == UNIT_WORDS:
-    return wordsLength(selected, sentences_lists) > summarySize
+    return words_length(selected, sentences_lists) > summarySize
   else:
     return len(selected) > summarySize
 
@@ -409,7 +409,7 @@ def select_sentences(summarySize,
     if argmax:
       selected.add(argmax) #internal: zero-based.
       #selectedList.add(argmax+1) #outside visibility: one-based indexing.
-      print argmax
+      #print argmax
     else:
       break
 
@@ -580,7 +580,7 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, sentences_
       sentence_embedding_i = get_sentence_embedding(flat_sentences[i], wordmodel, w2v_backend, quiet=quiet)
       for j in range(i, len(flat_sentences)):
         sentence_embedding_j = get_sentence_embedding(flat_sentences[j], wordmodel, w2v_backend, quiet=quiet)
-        w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_embedding_i, sentence_embedding_j)/numpy.sqrt(numpy.dot(sentence_embedding_i, sentence_embedding_i))+numpy.sqrt(numpy.dot(sentence_embedding_j, sentence_embedding_j))+1)
+        w2v_matrix[i][j] = 0.5 * (numpy.dot(sentence_embedding_i, sentence_embedding_j)/numpy.sqrt(numpy.dot(sentence_embedding_i, sentence_embedding_i))*numpy.sqrt(numpy.dot(sentence_embedding_j, sentence_embedding_j))+1)
         w2v_matrix[j][i] = w2v_matrix[i][j]
         if sentence_sim < minval:
           minval = sentence_sim
@@ -766,6 +766,7 @@ def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, leng
     print 'Summary:'
   for i in summary_list:
     if output_numbers:
+      #print "outputting numbers: %d"%(i+1)
       return_string += "%d\n"%(i+1)
     else:
       return_string += get_sentence_index(i, sentences_lists)+'\n'
@@ -794,7 +795,7 @@ def load_w2v_wordmodel(w2v_vector_file=W2V_VECTOR_FILE):
     from gensim.models import word2vec
     statinfo = os.stat(w2v_vector_file)
     if statinfo.st_size > 1073741824:
-      print('Loading word2vec file into memory. File is big (%d gigabytes). This might take a while. Run with --no-w2v to not use word2vec.'%(statinfo.st_size/1073741824.0))
+      print('Loading word2vec file into memory. File is big (%d gigabytes). This might take a while. Run with --no-w2v to not use word2vec, or use backend_worker.py.'%(statinfo.st_size/1073741824.0))
     return word2vec.Word2Vec.load_word2vec_format(w2v_vector_file, binary=True)
 
 def get_clustering(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, sentsim_matrix=None):
@@ -847,10 +848,15 @@ def main():
     elif sys.argv[i] == '--no-w2v':
       use_w2v_similarity = False
     elif sys.argv[i] == '--summary-length':
-      summary_length = sys.argv[i+1]
+      summary_length = int(sys.argv[i+1])
+      #print "summary-length: %d"%summary_length
       skip = True
     elif sys.argv[i] == '--summary-length-unit':
-      summary_length_unit = LENGTH_UNITS[sys.argv[i+1]]
+      key = sys.argv[i+1]
+      summary_length_unit = LENGTH_UNITS[key]
+      #for k in LENGTH_UNITS:
+      #  if LENGTH_UNITS[k] == summary_length_unit:
+      #    print "summary-length-unit: %s"%k
       skip = True
     elif sys.argv[i] == '--w2v-file':
       w2v_vector_file = sys.argv[i+1]
@@ -863,11 +869,11 @@ def main():
       w2v_experiments = sys.argv[i+1]
       skip = True
     elif sys.argv[i] == '--quiet':
+      print "Will be quiet."
       quiet = True
     elif sys.argv[i] == '--numerical':
       output_numbers = True
     elif sys.argv[i] == '--s':
-      # matrix files
       sentences_file = sys.argv[i+1]
       skip = True
     else:
