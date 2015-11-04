@@ -869,7 +869,6 @@ def main():
       w2v_experiments = sys.argv[i+1]
       skip = True
     elif sys.argv[i] == '--quiet':
-      print "Will be quiet."
       quiet = True
     elif sys.argv[i] == '--numerical':
       output_numbers = True
