@@ -279,7 +279,7 @@ def get_def_sentsims(sentences_lists, stopwordsFilename, idfs):
 
   # creating arrays for containing sentence vectors
   # each row is a sentence, each column corresponds to a word.
-  sentenceTFIDFVectors = numpy.zeros(len(vocabulary),(len(sentences_bags)))
+  sentenceTFIDFVectors = numpy.zeros((len(vocabulary),len(sentences_bags)))
   sentenceIDFVectors = numpy.zeros((len(vocabulary),len(sentences_bags)))
 
   if not idfs:
@@ -372,8 +372,7 @@ def select_sentences(summarySize,
                      lengthUnit,
                      idfVectorFileName,
                      docName,
-                     use_aggregate_for_clustering = False,
-                     min_sentence_length=MIN_SENTENCE_LENGTH):
+                     use_aggregate_for_clustering = False):
   #discarded = set()
   selected = set()
   aggMatrix = getMultipliedAggregateSimilarities(matrices)
@@ -383,6 +382,7 @@ def select_sentences(summarySize,
   #    print str(aggMatrix[i][j])+' ',
   #  print 'EOL'
 
+  #print "Computing clustering..."
   K = getK(count_sentences(sentences_lists))
   if use_aggregate_for_clustering:
     clustering = get_clustering(sentences_lists, DEFAULT_STOPWORDS, aggMatrix)
@@ -390,23 +390,22 @@ def select_sentences(summarySize,
     clustering = get_clustering_by_vectors(sentenceVectors, K, idfVectorFileName, docName)
   else:
     clustering = get_clustering(sentences_lists, DEFAULT_STOPWORDS)
+  #print "Clustering done."
 
   #print 'clustering done. back in multsum now.'
   #for i in clustering:
   #  print i
 
+  #print "Optimization loop:"
   while summary_is_too_short(selected, sentences_lists, lengthUnit, summarySize):
     max_val = 0.0
     argmax = None
     for i in range(0,aggMatrix.shape[0]):
       if i not in selected:# and i not in discarded:
-        if strip(get_sentence_index(i, sentences_lists)).count(' ')+1 < min_sentence_length:
-          continue
         selected.add(i)
         curr = L1 (selected, aggMatrix, None, A) + DEFAULT_LAMBDA * R1(selected, aggMatrix, clustering, K)
         # as in Lin-Bilmes 2010: */
         #print(str(curr)+" "+str(max_val)+" "+str(argmax))
-        #print(selected)
         if curr > max_val:
           argmax = i
           max_val = curr
@@ -414,8 +413,6 @@ def select_sentences(summarySize,
 
     if argmax:
       selected.add(argmax) #internal: zero-based.
-      #selectedList.add(argmax+1) #outside visibility: one-based indexing.
-      #print argmax
     else:
       break
 
@@ -500,7 +497,7 @@ def get_idfs_from_doc_collection(documentCluster, stopwords):
 
   return idfs
 
-def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_aggregate_for_clustering=False, min_sentence_length=MIN_SENTENCE_LENGTH):
+def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, output_numbers=True, use_aggregate_for_clustering=False, quiet=False):
   matrices = list()
 
   for filename in matrix_files:
@@ -539,19 +536,22 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=D
                      unit,
                      None,
                      'summarization_doc',
-                     use_aggregate_for_clustering=use_aggregate_for_clustering,
-                     min_sentence_length=min_sentence_length)
+                     use_aggregate_for_clustering=use_aggregate_for_clustering)
   summary_list = list(summary_set)
   summary_list.sort()
   return_string = ''
 
-  print 'Summary:'
+  if not quiet:
+    print 'Summary:'
   for i in summary_list:
-    if sentences_lists:
-      return_string += get_sentence_index(i, sentences_lists)+'\n'
-      print('  '+get_sentence_index(i, sentences_lists))
+    if output_numbers or not sentences_lists:
+      return_string += (i+1)+'\n'
+      if not quiet:
+        print(i+1) #one-based output, not zero-based.
     else:
-      print(i+1) #one-based output, not zero-based.
+      return_string += get_sentence_index(i, sentences_lists)+'\n'
+      if not quiet:
+        print('  '+get_sentence_index(i, sentences_lists))
   return return_string
 
 def get_sentence_embedding_avg(sentence, wordmodel, w2v_backend, quiet=False):
@@ -714,21 +714,39 @@ def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, leng
   #  for s in l:
   #    print s
 
+  sentence_count = 0
   if split_sentences:
     if not quiet:
       print 'splitting'
     splittedLists = []
     for l in sentences_lists:
       splittedList = []
+      documentstring = ""
       for s in l:
-        #splitted = re.split('[\.!?]', s)
-        splitted = re.split('(?<=[\.!\?])\W+', s)
-        for s in splitted:
-          if s:
-            splittedList.append(s.replace('\n', ''))
-            #print s
+        documentstring += " \n"+s
+      #splitted = re.split('[\.!?]', s)
+      splitted = re.split('(?<=[\.!\?])\W+', documentstring)
+      for s in splitted:
+        stripped = s.strip()
+        if stripped and stripped.count(' ')+1 > min_sentence_length:
+          sentence_count += 1
+          splittedList.append(s.replace('\n', ' '))
+          #print s
       splittedLists.append(splittedList)
     sentences_lists = splittedLists
+  elif min_sentence_length > 0:
+    new_sentences_lists = list()
+    for l in sentences_lists:
+      new_l = list()
+      for s in l:
+        if s.strip().count(' ')+1 <= min_sentence_length:
+          sentence_count += 1
+          new_l.append(s)
+      new_sentences_lists.append(new_l)
+    sentences_lists = new_sentences_lists
+
+  if not quiet:
+    print "Total sentence count after min length filtering and (possibly) splitting: %d"%(sentence_count)
 
   sentences_lists = multsum_preprocess.preprocess(sentences_lists, anaphora_resolution_simple=anaphora_resolution_simple)
   
@@ -777,21 +795,20 @@ def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, leng
                      unit,
                      None,
                      'summarization_doc',
-                     use_aggregate_for_clustering=use_aggregate_for_clustering,
-                     min_sentence_length=min_sentence_length)
+                     use_aggregate_for_clustering=use_aggregate_for_clustering)
   summary_list = list(summary_set)
   summary_list.sort()
   return_string = ''
-  if not quiet:
-    print 'Summary:'
+  #if not quiet:
+  #  print 'Summary:'
   for i in summary_list:
     if output_numbers:
       #print "outputting numbers: %d"%(i+1)
       return_string += "%d\n"%(i+1)
     else:
       return_string += get_sentence_index(i, sentences_lists)+'\n'
-    if not quiet:
-      print('  '+get_sentence_index(i, sentences_lists))
+    #if not quiet:
+    #  print('  '+get_sentence_index(i, sentences_lists))
   return return_string
  
 
@@ -802,8 +819,9 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
     f = open(filename, 'r')
     sentences = list()
     for line in f:
-      if line:
-        sentences.append(line)
+      stripped = line.strip()
+      if stripped:
+        sentences.append(stripped)
     num_sentences += len(sentences)
     sentences_lists.append(sentences)
 
@@ -932,7 +950,7 @@ def main():
     summary = summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple, min_sentence_length=min_sentence_length)
     print summary
   else:
-    summary = summarize_matrix_files(files, sentences_file)
+    summary = summarize_matrix_files(files, sentences_file, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, quiet=quiet)
     print summary
     
 

@@ -40,10 +40,10 @@ def getK(N):
   if K == 0: K = 1
   return K
 
-def getClusteringBySimilarities(similarities, K,  docName = None, keep=False):
+def get_clustering_by_similarities(similarities, K,  docName = None, keep=False):
   return voronoi_iteration(similarities, K, similarity_matrix=True)
 
-def getClusteringByVectors(sentenceVectors, K, matrixFileName = None, docName = None, keep=False):
+def get_clustering_by_vectors(sentenceVectors, K, matrixFileName = None, docName = None, keep=False):
   return voronoi_iteration(sentenceVectors, K, similarity_matrix=False)
 
 '''
