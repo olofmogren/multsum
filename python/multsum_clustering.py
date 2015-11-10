@@ -29,9 +29,6 @@ from subprocess import call
  # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
-CLUTO_SCLUSTER_EXECUTABLE = "/home/mogren/sync/code/others_code/cluto/scluster"
-CLUTO_VCLUSTER_EXECUTABLE = "/home/mogren/sync/code/others_code/cluto/vcluster"
-
 DEFAULT_STOPWORDS = 'english_stopwords.txt'
 
 DEFAULT_VECTORS_FILE_PREFIX = '/tmp/submod_py_vectors.'
@@ -47,22 +44,7 @@ def getClusteringBySimilarities(similarities, K,  docName = None, keep=False):
   return voronoi_iteration(similarities, K, similarity_matrix=True)
 
 def getClusteringByVectors(sentenceVectors, K, matrixFileName = None, docName = None, keep=False):
-  return voronoi_iteration(similarities, K, similarity_matrix=False)
-
-  if CLUTO_VCLUSTER_EXECUTABLE and os.path.isfile(CLUTO_VCLUSTER_EXECUTABLE):
-    return getClusteringCluto(sentenceVectors, K, matrixFileName, docName, keep, simclustering=False)
-  else:
-    print("Did not find cluto binary (looked in %s). Will try to cluster using scipy."%(CLUTO_VCLUSTER_EXECUTABLE))
-    return getClusteringByVectorsScipy(sentenceVectors, K)
-
-def getClusteringByVectorsScipy(sentenceVectors, K):
-  retries = 0
-  while retries < MAX_RETRIES:
-    try:
-      (centroid, label) = scipy.cluster.vq.kmeans2(sentenceVectors, K, minit='points')#, iter=10, thresh=1e-05, missing='warn', check_finite=True)
-    except:
-      print("Some error in clustering. Retrying max %d times. %d"%(MAX_RETRIES, retries))
-  return label
+  return voronoi_iteration(sentenceVectors, K, similarity_matrix=False)
 
 '''
 
@@ -79,7 +61,7 @@ TODO: currently, clustering by vectors just computes (cosine) similarities and t
 similarity clustering. future, try kmeans?
 '''
 def voronoi_iteration(matrix, K, similarity_matrix=True):
-  num_sentences = matrix.shape[0]
+  num_sentences = matrix.shape[1]
   if similarity_matrix:
     similarities = matrix
   else:

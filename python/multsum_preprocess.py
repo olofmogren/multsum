@@ -43,7 +43,7 @@ def preprocess(sentences_lists, anaphora_resolution_simple=False):
                  processed_sentence = processed_sentence+" "
                processed_sentence = processed_sentence+words[i]
           if processed_sentence != sentence:
-            print "original: %s\npreprocessed: %s"%(sentence, processed_sentence)
+            print "original:     %s\npreprocessed: %s"%(sentence, processed_sentence)
           list_to_return.append(processed_sentence)
         list_of_lists_to_return.append(list_to_return)
     except Exception, e:
