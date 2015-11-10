@@ -2,61 +2,60 @@ import re
 
 REGEX_SPACE         = " +"
 
-def preprocess(sentences_lists, anaphora_resolution_simple=False):
+def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
   if anaphora_resolution_simple:
-    list_of_lists_to_return = list()
+    documents_to_return = list()
     try:
-      for sentence_list in sentences_lists:
-        list_to_return = list()
+      for document in documents:
+        document_to_return = list()
         previous_person = None
         previous_person_plural = None
-        for sentence in sentence_list:
-          words = re.split(REGEX_SPACE, sentence)
+        for sentence in document:
+          # sentence is already a list of words. No need to split.
+          #words = re.split(REGEX_SPACE, sentence)
           import nltk
-          tagged = nltk.pos_tag(words)
+          tagged = nltk.pos_tag(sentence)
           tags = [item[1] for item in tagged]
-          if len(tagged) != len(words):
+          if len(tagged) != len(sentence):
             print "length of tagged (%d) differs from number of words in sentence (%d)"%(len(tagged) != len(words_i))
             exit()
-          processed_sentence = ""
-          for i in xrange(0, len(words)):
+          processed_sentence = list()
+          for i in xrange(0, len(sentence)):
             #if (tags[i] == "PRP" or tags[i] == "PRP$") and words[i] != "it":
-            if is_pronoun_to_replace(words[i]):
+            if is_pronoun_to_replace(sentence[i]):
               possessive_suffix = ""
-              if is_possessive_pronoun(words[i]):
+              if is_possessive_pronoun(sentence[i]):
               #if tags[i][-1] == "$":
                 # English bias:
                 possessive_suffix = "'s"
               punctuation = ""
-              last_char = words[i][-1]
-              word_without_punctuation = words[i]
+              last_char = sentence[i][-1]
+              word_without_punctuation = sentence[i]
               if is_punctuation(last_char):
                 punctuation = last_char
-                word_without_punctuation = words[i][:-1]
-              if is_plural_pronoun(words[i]) and previous_person_plural is not None:
-                processed_sentence = processed_sentence+" "+word_without_punctuation+" ("+previous_person_plural+possessive_suffix+")"+punctuation
+                word_without_punctuation = sentence[i][:-1]
+              if is_plural_pronoun(sentence[i]) and previous_person_plural is not None:
+                processed_sentence.append(word_without_punctuation+" ("+previous_person_plural+possessive_suffix+")"+punctuation)
               elif previous_person is not None:
-                processed_sentence = processed_sentence+" "+word_without_punctuation+" ("+previous_person+possessive_suffix+")"+punctuation
+                processed_sentence.append(word_without_punctuation+" ("+previous_person+possessive_suffix+")"+punctuation)
             else:
                if tags[i] == "NNP":
-                 previous_person = words[i].strip(".?!,'\"\n ")
+                 previous_person = sentence[i].strip(".?!,'\"\n ")
                elif tags[i] == "NNPS":
-                 previous_person_plural = words[i].strip(".?!,'\"\n ")
-               if len(processed_sentence) > 0:
-                 processed_sentence = processed_sentence+" "
-               processed_sentence = processed_sentence+words[i]
-          if processed_sentence != sentence:
-            print "preprocessed: %s"%(processed_sentence)
+                 previous_person_plural = sentence[i].strip(".?!,'\"\n ")
+               processed_sentence.append(sentence[i])
+          if processed_sentence != sentence and not quiet:
+            print "preprocessed: %s"%(' '.join(processed_sentence))
             #print "original:     %s\npreprocessed: %s"%(sentence, processed_sentence)
-          list_to_return.append(processed_sentence)
-        list_of_lists_to_return.append(list_to_return)
+          document_to_return.append(processed_sentence)
+        documents_to_return.append(document_to_return)
     except Exception, e:
       print e
       print "Could not import NLTK. Please install it."
-      return sentences_lists
-    return list_of_lists_to_return
+      return documents
+    return documents_to_return
   else:
-    return sentences_lists
+    return documents
 
 
 def is_punctuation(char):

@@ -25,9 +25,9 @@ def analyze_sentiment(sentences):
     positive_frac = 0.0
     negative_frac = 0.0
     #words = s.split()
-    words = re.findall(r"[\w']+", s)
-    if len(words) > 0:
-      for w in words:
+    #words = re.findall(r"[\w']+", s)
+    if len(s) > 0:
+      for w in s:
         #"print w
         if w.lower() in positive_emotions:
           #print "positive! "+w
@@ -35,8 +35,8 @@ def analyze_sentiment(sentences):
         elif w.lower() in negative_emotions:
           #print "negative! "+w
           negative_count += 1
-      positive_frac = float(positive_count) / len(words)
-      negative_frac = float(negative_count) / len(words)
+      positive_frac = float(positive_count) / float(len(s))
+      negative_frac = float(negative_count) / float(len(s))
     emo_vec = [positive_frac, negative_frac]
     emo_vectors.append(emo_vec)
   # cosinesim is btw -1 and 1.
@@ -69,7 +69,7 @@ def analyze_sentiment(sentences):
         else:
           normalized_simpos = 0.0
           normalized_simneg = 0.0
-          if len(sentences[i].replace('\n', '').strip()) > 0 and len(sentences[j].replace('\n', '').strip()) > 0:
+          if len(sentences[i]) > 0 and len(sentences[j]) > 1:
             if max_simpos-min_simpos > 0.0:
               normalized_simpos = (simpos-min_simpos)/(max_simpos-min_simpos)
             if max_simneg-min_simneg > 0.0:

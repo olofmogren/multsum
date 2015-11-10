@@ -73,7 +73,7 @@ Some of the options below can also be used with the GUI for MULTSUM, multsum_gui
 
    Options:
 
-     --spl:             Do not split sentences using regex. Assume one sentence per line instead (SPL).
+     --split:           Split sentences using regex.
      --no-tfidf:        Do not use similarity measure based on
                         tfidf (See Lin&Bilmes, 2011) (Default is to use it).
      --no-sentiment:    Do not use similarity measure based on
@@ -172,21 +172,20 @@ def getMultipliedAggregateSimilarities(ms):
 
   return aggregateSim
 
-def get_sentences_bags_flat(stopwords, documents):
+def get_sentences_bags_flat(stopwords, sentences_lists):
   sentence_bag_list = list()
 
   first = True
-  for document in documents:
-    for sentence in document:
+  for sentences in sentences_lists:
+    for sentence in sentences:
       #if first:
       #  print 'First sentence, (creating bags).'
       #  print sentence
       current_sentence = dict()
       if len(sentence) > 0:
-        #words = re.split(REGEX_SPACE, sentence)
-        # Input is already split. It is now a list of words.
+        words = re.split(REGEX_SPACE, sentence)
         prev = None
-        for w in sentence:
+        for w in words:
           if not w.replace("_", ""):
             continue
           w = w.lower()
@@ -217,58 +216,53 @@ def get_stopwords(stopwordsFilename):
   f.close()
   return stopwords
 
-def count_sentences(documents):
+def count_sentences(sentences_lists):
   lines = 0
-  for document in documents:
-    lines += len(document)
+  for l in sentences_lists:
+    lines += len(l)
   return lines
 
-def get_sentence_index(i, documents):
+def get_sentence_index(i, sentences_lists):
   searchedLines = 0
-  for document in documents:
-    if searchedLines + len(document) > i:
-      return document[i-searchedLines]
+  for l in sentences_lists:
+    if searchedLines + len(l) > i:
+      return l[i-searchedLines]
     else:
-      searchedLines += len(document)
+      searchedLines += len(l)
   return None
 
-def characters_length(selected, documents):
+def characters_length(selected, sentences_lists):
   chars = 0
   for i in selected:
-    sentence_chars = 0
-    sentence = get_sentence_index(i, documents)
-    for word in sentence:
-      # The +1 counts an implicit space between each word.
-      sentence_chars += len(word)+1
-    chars += sentence_chars
+    chars += len(get_sentence_index(i, sentences_lists))
   return chars
 
-def words_length(selected, documents):
+def words_length(selected, sentences_lists):
   words = 0
   for i in selected:
-    words += len(get_sentence_index(i, documents))
+    words += len(get_sentence_index(i, sentences_lists).split())
   return words
 
-def summary_is_too_short(selected, documents, lengthUnit, summarySize):
+def summary_is_too_short(selected, sentences_lists, lengthUnit, summarySize):
   if lengthUnit == UNIT_CHARACTERS:
-    return characters_length(selected, documents) < summarySize
+    return characters_length(selected, sentences_lists) < summarySize
   elif lengthUnit == UNIT_WORDS:
-    return words_length(selected, documents) < summarySize
+    return words_length(selected, sentences_lists) < summarySize
   else:
     return len(selected) < summarySize
 
-def summary_is_too_long(selected, documents, lengthUnit, summarySize):
+def summary_is_too_long(selected, sentences_lists, lengthUnit, summarySize):
   if lengthUnit == UNIT_CHARACTERS:
-    return characters_length(selected, documents) > summarySize
+    return characters_length(selected, sentences_lists) > summarySize
   elif lengthUnit == UNIT_WORDS:
-    return words_length(selected, documents) > summarySize
+    return words_length(selected, sentences_lists) > summarySize
   else:
     return len(selected) > summarySize
 
-def get_def_sentsims(documents, stopwordsFilename, idfs):
+def get_def_sentsims(sentences_lists, stopwordsFilename, idfs):
   stopwords = get_stopwords(stopwordsFilename) #set
 
-  sentences_bags = get_sentences_bags_flat(stopwords, documents) #list of dicts, from word to wordcount
+  sentences_bags = get_sentences_bags_flat(stopwords, sentences_lists) #list of dicts, from word to wordcount
   #print(sentences_bags)
 
   vocabulary_s = set() #list of strings
@@ -289,8 +283,8 @@ def get_def_sentsims(documents, stopwordsFilename, idfs):
   sentenceIDFVectors = numpy.zeros((len(vocabulary),len(sentences_bags)))
 
   if not idfs:
-      # The following is what lin-bilmes did, if documents contains each document in a cluster.
-    idfs = get_idfs_from_doc_collection(documents, stopwords)
+      # The following is what lin-bilmes did, if sentences_lists contains each document in a cluster.
+    idfs = get_idfs_from_doc_collection(sentences_lists, stopwords)
   #print(idfs)
   
   # Denominators for the cosine similarity computation: #/
@@ -374,7 +368,7 @@ def get_def_sentsims(documents, stopwordsFilename, idfs):
 def select_sentences(summarySize,
                      matrices,
                      sentenceVectors,
-                     documents,
+                     sentences_lists,
                      lengthUnit,
                      idfVectorFileName,
                      docName,
@@ -389,13 +383,13 @@ def select_sentences(summarySize,
   #  print 'EOL'
 
   #print "Computing clustering..."
-  K = getK(count_sentences(documents))
+  K = getK(count_sentences(sentences_lists))
   if use_aggregate_for_clustering:
-    clustering = get_clustering(documents, DEFAULT_STOPWORDS, aggMatrix)
+    clustering = get_clustering(sentences_lists, DEFAULT_STOPWORDS, aggMatrix)
   elif not sentenceVectors is None:
     clustering = get_clustering_by_vectors(sentenceVectors, K, idfVectorFileName, docName)
   else:
-    clustering = get_clustering(documents, DEFAULT_STOPWORDS)
+    clustering = get_clustering(sentences_lists, DEFAULT_STOPWORDS)
   #print "Clustering done."
 
   #print 'clustering done. back in multsum now.'
@@ -403,7 +397,7 @@ def select_sentences(summarySize,
   #  print i
 
   #print "Optimization loop:"
-  while summary_is_too_short(selected, documents, lengthUnit, summarySize):
+  while summary_is_too_short(selected, sentences_lists, lengthUnit, summarySize):
     max_val = 0.0
     argmax = None
     for i in range(0,aggMatrix.shape[0]):
@@ -431,7 +425,7 @@ def select_sentences(summarySize,
   for i in range(0,aggMatrix.shape[0]):
     singleton = set()
     singleton.add(i)
-    if not summary_is_too_long(singleton, documents, lengthUnit, summarySize):
+    if not summary_is_too_long(singleton, sentences_lists, lengthUnit, summarySize):
       singletonSummaryScore = L1(singleton, aggMatrix, None, A) + DEFAULT_LAMBDA * R1(singleton, aggMatrix, clustering, K)
       if singletonSummaryScore > currentlyBestCScore:
         currentlyBestCScore = singletonSummaryScore
@@ -449,31 +443,30 @@ def select_sentences(summarySize,
    # 
    #/
 
-def get_idfs_from_doc_collection(documents, stopwords):
+def get_idfs_from_doc_collection(documentCluster, stopwords):
   documentCountsForTerm = dict() # dictfrom string to integer
 
   # Special case: if all sentences are from one file, idfs from one document make no sense.
   # (similarities would be zero).
   # Will then consider each sentence as one document.
-  if len(documents) <= 1:
+  if len(documentCluster) <= 1:
     newCluster = list()
-    document = documents[0]
+    document = documentCluster[0]
     for s in document:
       l = list()
       l.append(s)
       newCluster.append(l)
     
-    documents = newCluster
+    documentCluster = newCluster
   
 
-  for document in documents:
+  for document in documentCluster:
     curDoc = set()
     for sentence in document:
       if len(sentence) > 0:
-        #No need to split sentence. It's already a list of words/tokens
-        #words = sentence.split()
+        words = sentence.split()
         prev = None
-        for w in sentence:
+        for w in words:
           w = w.replace("_", "").replace(".", "").replace(",", "").replace("!", "").replace("?", "").replace("-", "")
           if not w:
             continue
@@ -498,7 +491,7 @@ def get_idfs_from_doc_collection(documents, stopwords):
   
   idfs = dict()
   for term in documentCountsForTerm:
-    idfs[term] = math.log(len(documents)/documentCountsForTerm[term], 10)
+    idfs[term] = math.log(len(documentCluster)/documentCountsForTerm[term], 10)
   
   #print("Done calculating IDFS.")
 
@@ -527,20 +520,19 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=D
     
     matrices.append(matrix)
 
-  documents = list()
+  sentences_lists = list()
   print sentence_file
   f = open(sentence_file, 'r')
   sentences = list()
   for line in f:
     if line:
-      words = re.split(REGEX_SPACE, line)
-      sentences.append(words)
-  documents.append(sentences)
+      sentences.append(line)
+  sentences_lists.append(sentences)
 
   summary_set = select_sentences(length,
                      matrices,
                      None,
-                     documents,
+                     sentences_lists,
                      unit,
                      None,
                      'summarization_doc',
@@ -552,24 +544,22 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=D
   if not quiet:
     print 'Summary:'
   for i in summary_list:
-    if output_numbers or not documents:
+    if output_numbers or not sentences_lists:
       return_string += (i+1)+'\n'
       if not quiet:
         print(i+1) #one-based output, not zero-based.
     else:
-      return_string += get_sentence_index(i, documents)+'\n'
+      return_string += get_sentence_index(i, sentences_lists)+'\n'
       if not quiet:
-        print('  '+get_sentence_index(i, documents))
+        print('  '+get_sentence_index(i, sentences_lists))
   return return_string
 
 def get_sentence_embedding_avg(sentence, wordmodel, w2v_backend, quiet=False):
-  # Sentence is a list of words/tokens. No need to split.
-  #words = re.split(REGEX_SPACE, sentence.lower())
+  words = re.split(REGEX_SPACE, sentence.lower())
   sentence_embedding = 0.0
   count = 0.0
-  for w in sentence:
-    word = w.lower()
-    wordrep = get_word_embedding(word, wordmodel, w2v_backend, quiet=quiet)
+  for w in words:
+    wordrep = get_word_embedding(w, wordmodel, w2v_backend, quiet=quiet)
     if wordrep is not None:
       sentence_embedding += wordrep
       count = count + 1.0
@@ -586,7 +576,7 @@ def get_word_embedding(word, wordmodel, w2v_backend, quiet=False):
     wordrep = backend_get_representation(word, quiet=quiet)
   return wordrep
 
-def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents, w2v_experiments="", quiet=False):
+def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, sentences_lists, w2v_experiments="", quiet=False):
   w2v_matrix = numpy.zeros((len(flat_sentences), len(flat_sentences)))
   minval = 1.0
   maxval = 0.0
@@ -613,8 +603,8 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
           argmax_i = i
           argmax_j = j
   else:
-    sentences_bags = get_sentences_bags_flat(stopwords, documents) #list of dicts, from word to wordcount
-    idfs = get_idfs_from_doc_collection(documents, stopwords)
+    sentences_bags = get_sentences_bags_flat(stopwords, sentences_lists) #list of dicts, from word to wordcount
+    idfs = get_idfs_from_doc_collection(sentences_lists, stopwords)
     #splitted_sentence_lists = list()
     selected_reps = list()
     reps = list()
@@ -624,14 +614,14 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
     for i in range(0, num_sentences):
       #if not quiet:
       # print "%d of %d (suppress with --quiet)."%(i, num_sentences)
-      #words_i = re.split(REGEX_SPACE, flat_sentences[i].lower())
+      words_i = re.split(REGEX_SPACE, flat_sentences[i].lower())
       #splitted_sentence_lists.append(words_i)
       if "POSMATCH" in w2v_experiments:
         try:
           import nltk
-          tagged = nltk.pos_tag(flat_sentences[i])
-          if len(tagged) != len(flat_sentences[i]):
-            print "length of tagged (%d) differs from number of words in sentence (%d)"%(len(tagged) != len(flat_sentences[i]))
+          tagged = nltk.pos_tag(words_i)
+          if len(tagged) != len(words_i):
+            print "length of tagged (%d) differs from number of words in sentence (%d)"%(len(tagged) != len(words_i))
             exit()
           postagged_sentences.append([item[1] for item in tagged])
         except:
@@ -639,18 +629,14 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
           exit()
       reps_i = list()
       tfidfs_i = list()
-      for word_i in flat_sentences[i]:
-        word_lc = word_i.lower()
-        stem_i = stem(word_lc)
-        if stem_i and stem_i in sentences_bags[i] and stem_i in idfs:
-          tfidf_i = sentences_bags[i][stem_i]*idfs[stem_i]
-        elif word_lc and word_lc in sentences_bags[i] and word_lc in idfs:
-          tfidf_i = sentences_bags[i][word_lc]*idfs[word_lc]
-        else:
-          tfidf_i = 0.0 #TODO: will this work?
-        word_embedding_i = get_word_embedding(word_lc, wordmodel, w2v_backend, quiet=quiet)
-        #if word_embedding_i is None:
-        #  continue
+      for word_i in words_i:
+        stem_i = stem(word_i)
+        if not stem_i or not stem_i in sentences_bags[i] or not stem_i in idfs:
+          continue
+        tfidf_i = sentences_bags[i][stem_i]*idfs[stem_i]
+        word_embedding_i = get_word_embedding(word_i, wordmodel, w2v_backend, quiet=quiet)
+        if word_embedding_i is None:
+          continue
         if "TFIDFWEIGHT" in w2v_experiments:
           word_embedding_i *= tfidf_i
         tfidfs_i.append(tfidf_i)
@@ -673,9 +659,7 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
           for jj in range(0,len(selected_reps[j])):
             word_embedding_i = selected_reps[i][ii]
             word_embedding_j = selected_reps[j][jj]
-            if "POSMATCH" in w2v_experiments and postagged_sentences[i][ii] != postagged_sentences[j][jj]:
-              continue
-            if word_embedding_i is None or word_embedding_j is None:
+            if "POSMATCH" in w2v_experiments and postagged_sentences[ii] != postagged_sentences[jj]:
               continue
             similarity = 0.5 * (numpy.dot(word_embedding_i, word_embedding_j)/numpy.sqrt(numpy.dot(word_embedding_i, word_embedding_i))*numpy.sqrt(numpy.dot(word_embedding_j, word_embedding_j))+1)
             scores.append(similarity)
@@ -712,8 +696,8 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
 
   
   if not quiet:
-    print "maximally similar sentences (%d,%d) (score %f): \n  \"%s\"\n  \"%s\""%(argmax_i,argmax_j,w2v_matrix[argmax_i][argmax_j],' '.join(flat_sentences[argmax_i]), ' '.join(flat_sentences[argmax_j]))
-    print "minimally similar sentences (%d,%d) (score %f): \n  \"%s\"\n  \"%s\""%(argmin_i,argmin_j,w2v_matrix[argmin_i][argmin_j],' '.join(flat_sentences[argmin_i]), ' '.join(flat_sentences[argmin_j]))
+    print "maximally similar sentences (%d,%d) (score %f): \n  \"%s\"\n  \"%s\""%(argmax_i,argmax_j,w2v_matrix[argmax_i][argmax_j],flat_sentences[argmax_i], flat_sentences[argmax_j])
+    print "minimally similar sentences (%d,%d) (score %f): \n  \"%s\"\n  \"%s\""%(argmin_i,argmin_j,w2v_matrix[argmin_i][argmin_j],flat_sentences[argmin_i], flat_sentences[argmin_j])
     #for i in range(0, len(flat_sentences)):
     #  for j in range(0, len(flat_sentences)):
     #    if j != 0:
@@ -723,24 +707,53 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
   
   return w2v_matrix
 
-'''
-  input (documents) here is a list of lists of lists.
-  Each document is a list of sentences.
-  Each sentence is a list of words or tokens.
+def summarize_strings(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, split_sentences=False, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False, min_sentence_length=MIN_SENTENCE_LENGTH):
 
-'''
-def summarize_documents(documents, stopwordsFilename=DEFAULT_STOPWORDS, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False, min_sentence_length=MIN_SENTENCE_LENGTH):
-
-  # print 'summarize_documents()'
-  #for l in documents:
+  # print 'summarize_strings()'
+  #for l in sentences_lists:
   #  for s in l:
   #    print s
-  documents = multsum_preprocess.preprocess(documents, anaphora_resolution_simple=anaphora_resolution_simple, quiet=quiet)
+
+  sentence_count = 0
+  if split_sentences:
+    if not quiet:
+      print 'splitting'
+    splittedLists = []
+    for l in sentences_lists:
+      splittedList = []
+      documentstring = ""
+      for s in l:
+        documentstring += " \n"+s
+      #splitted = re.split('[\.!?]', s)
+      splitted = re.split('(?<=[\.!\?])\W+', documentstring)
+      for s in splitted:
+        stripped = s.strip()
+        if stripped and stripped.count(' ')+1 > min_sentence_length:
+          sentence_count += 1
+          splittedList.append(s.replace('\n', ' '))
+          #print s
+      splittedLists.append(splittedList)
+    sentences_lists = splittedLists
+  elif min_sentence_length > 0:
+    new_sentences_lists = list()
+    for l in sentences_lists:
+      new_l = list()
+      for s in l:
+        if s.strip().count(' ')+1 <= min_sentence_length:
+          sentence_count += 1
+          new_l.append(s)
+      new_sentences_lists.append(new_l)
+    sentences_lists = new_sentences_lists
+
+  if not quiet:
+    print "Total sentence count after min length filtering and (possibly) splitting: %d"%(sentence_count)
+
+  sentences_lists = multsum_preprocess.preprocess(sentences_lists, anaphora_resolution_simple=anaphora_resolution_simple)
   
-  sentsims = get_def_sentsims(documents, stopwordsFilename, None)
+  sentsims = get_def_sentsims(sentences_lists, stopwordsFilename, None)
 
   matrices = list()
-  flat_sentences = [sentence for document in documents for sentence in document]
+  flat_sentences = [sentence for document in sentences_lists for sentence in document]
   #for sentence in flat_sentences:
   #  print sentence
   if use_sentiment_similarity:
@@ -756,7 +769,7 @@ def summarize_documents(documents, stopwordsFilename=DEFAULT_STOPWORDS, length=D
     elif not w2v_backend:
       wordmodel = load_w2v_wordmodel(w2v_vector_file)
     if wordmodel or w2v_backend:
-      w2v_matrix = get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, get_stopwords(stopwordsFilename), documents, w2v_experiments, quiet=quiet)
+      w2v_matrix = get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, get_stopwords(stopwordsFilename), sentences_lists, w2v_experiments, quiet=quiet)
       if not w2v_matrix is None:
         matrices.append(w2v_matrix)
   if use_tfidf_similarity or len(matrices) == 0:
@@ -765,9 +778,9 @@ def summarize_documents(documents, stopwordsFilename=DEFAULT_STOPWORDS, length=D
 
   if not quiet:
     print 'Input sentences:'
-    for l in documents:
+    for l in sentences_lists:
       for s in l:
-        print '  '+' '.join(s)
+        print '  '+s
 
   #for m in matrices:
   #  for i in range(0,m.shape[0]):
@@ -778,7 +791,7 @@ def summarize_documents(documents, stopwordsFilename=DEFAULT_STOPWORDS, length=D
   summary_set = select_sentences(length,
                      matrices,
                      sentsims["idf_vectors"],
-                     documents,
+                     sentences_lists,
                      unit,
                      None,
                      'summarization_doc',
@@ -793,68 +806,29 @@ def summarize_documents(documents, stopwordsFilename=DEFAULT_STOPWORDS, length=D
       #print "outputting numbers: %d"%(i+1)
       return_string += "%d\n"%(i+1)
     else:
-      return_string += ' '.join(get_sentence_index(i, documents))+'\n'
+      return_string += get_sentence_index(i, sentences_lists)+'\n'
     #if not quiet:
-    #  print('  '+get_sentence_index(i, documents))
+    #  print('  '+get_sentence_index(i, sentences_lists))
   return return_string
  
 
-def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=True, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False, min_sentence_length=MIN_SENTENCE_LENGTH):
-  lines_lists = list()
-  num_lines = 0
+def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=False, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False, min_sentence_length=MIN_SENTENCE_LENGTH):
+  sentences_lists = list()
+  num_sentences = 0
   for filename in document_names:
     f = open(filename, 'r')
-    lines = list()
+    sentences = list()
     for line in f:
       stripped = line.strip()
       if stripped:
-        lines.append(stripped)
-    num_lines += len(lines)
-    lines_lists.append(lines)
+        sentences.append(stripped)
+    num_sentences += len(sentences)
+    sentences_lists.append(sentences)
 
   if not quiet:
-    print "Total line count (suppress this with --quiet): %d."%num_lines
+    print "Total sentence count (suppress this with --quiet): %d."%num_sentences
   
-
-  sentence_count = 0
-  documents = []
-  if split_sentences:
-    if not quiet:
-      print 'splitting'
-    for l in lines_lists:
-      document = []
-      documentstring = ""
-      for s in l:
-        documentstring += " \n"+s
-      #splitted = re.split('[\.!?]', s)
-      splitted = re.split('(?<=[\.!\?])\W+', documentstring)
-      for s in splitted:
-        stripped = s.strip()
-        if stripped:
-          # The following line splits the sentence into a list of words
-          wordlist = re.split(REGEX_SPACE, stripped)
-          #wordlist = stripped.split()
-          if len(wordlist) > min_sentence_length:
-            sentence_count += 1
-            document.append(stripped.replace('\n', ' ').split())
-      documents.append(document)
-  else:
-    for l in lines_lists:
-      document = list()
-      for s in l:
-        stripped = s.strip()
-        if stripped:
-          # The following line splits the sentence into a list of words
-          wordlist = re.split(REGEX_SPACE, stripped)
-          if len(wordlist) <= min_sentence_length:
-            sentence_count += 1
-            document.append(wordlist)
-      documents.append(document)
-
-  if not quiet:
-    print "Total sentence count after min length filtering and (possibly) splitting: %d"%(sentence_count)
-
-  return summarize_documents(documents, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple, min_sentence_length=min_sentence_length)
+  return summarize_strings(sentences_lists, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, split_sentences=split_sentences, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple, min_sentence_length=min_sentence_length)
 
 def load_w2v_wordmodel(w2v_vector_file=W2V_VECTOR_FILE):
   if not os.path.isfile(w2v_vector_file):
@@ -867,9 +841,9 @@ def load_w2v_wordmodel(w2v_vector_file=W2V_VECTOR_FILE):
       print('Loading word2vec file into memory. File is big (%d gigabytes). This might take a while. Run with --no-w2v to not use word2vec, or use backend_worker.py.'%(statinfo.st_size/1073741824.0))
     return word2vec.Word2Vec.load_word2vec_format(w2v_vector_file, binary=True)
 
-def get_clustering(documents, stopwordsFilename=DEFAULT_STOPWORDS, sentsim_matrix=None):
+def get_clustering(sentences_lists, stopwordsFilename=DEFAULT_STOPWORDS, sentsim_matrix=None):
   if sentsim_matrix is None:
-    sentsims = get_def_sentsims(documents, stopwordsFilename, None)
+    sentsims = get_def_sentsims(sentences_lists, stopwordsFilename, None)
     sentsim_matrix = sentsims["tfidf_cosine"]
   K = getK(sentsim_matrix.shape[0])
   clustering = get_clustering_by_similarities(sentsim_matrix, K, "summarization_doc")
@@ -882,7 +856,7 @@ def main():
   sentences_file = None
   skip = False
 
-  split_sentences = True
+  split_sentences = False
 
   use_tfidf_similarity = True
   use_sentiment_similarity = True
@@ -912,8 +886,8 @@ def main():
     if sys.argv[i] == '--m':
       # matrix files
       doc_files = False
-    elif sys.argv[i] == '--spl':
-      split_sentences = False
+    elif sys.argv[i] == '--split':
+      split_sentences = True
     elif sys.argv[i] == '--anaphora-resolution-simple':
       anaphora_resolution_simple = True
     elif sys.argv[i] == '--no-tfidf':
