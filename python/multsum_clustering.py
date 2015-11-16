@@ -40,11 +40,11 @@ def getK(N):
   if K == 0: K = 1
   return K
 
-def get_clustering_by_similarities(similarities, K,  docName = None, keep=False):
-  return voronoi_iteration(similarities, K, similarity_matrix=True)
+def get_clustering_by_similarities(similarities, K,  docName = None, keep=False, debug_sentences=None):
+  return voronoi_iteration(similarities, K, similarity_matrix=True, debug_sentences=debug_sentences)
 
-def get_clustering_by_vectors(sentenceVectors, K, matrixFileName = None, docName = None, keep=False):
-  return voronoi_iteration(sentenceVectors, K, similarity_matrix=False)
+def get_clustering_by_vectors(sentenceVectors, K, matrixFileName = None, docName = None, keep=False, debug_sentences=None):
+  return voronoi_iteration(sentenceVectors, K, similarity_matrix=False, debug_sentences=debug_sentences)
 
 '''
 
@@ -60,7 +60,7 @@ not currently using soft limit for improvement.
 TODO: currently, clustering by vectors just computes (cosine) similarities and then uses code for
 similarity clustering. future, try kmeans?
 '''
-def voronoi_iteration(matrix, K, similarity_matrix=True):
+def voronoi_iteration(matrix, K, similarity_matrix=True, debug_sentences=None):
   num_sentences = matrix.shape[1]
   if similarity_matrix:
     similarities = matrix
@@ -106,6 +106,23 @@ def voronoi_iteration(matrix, K, similarity_matrix=True):
   for c in xrange(0,len(cluster_members)):
     for s in cluster_members[c]:
       clustering[s] = c
+  if debug_sentences:
+    print "Outputting clustering. Below (all zero-based): medoid, sentence1 (medoid_distance), sentence2 (medoid_distance), ..."
+    for m in medoids:
+      c = medoids.index(m)
+      members = list(cluster_members[c])
+      simlist = list()
+      print "\"***cluster of size %d. medoid: %s\""%(len(members),' '.join(debug_sentences[m])),
+      for s in members:
+        simlist.append((s,similarities[m][s]))
+      backwards = [(v[1],v[0]) for v in simlist]
+      backwards.sort(reverse=True)
+      forwards = [(v[1],v[0]) for v in backwards]
+      for pair in forwards:
+        print "\"%s\""%' '.join(debug_sentences[pair[0]]),
+        print "(%.3f)"%pair[1],
+      print "\n"
+    
   #for i in clustering:
   #  print i,
   return clustering

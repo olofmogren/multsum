@@ -110,6 +110,8 @@ Global Options:
    --quiet:                        Do not talk so much.
    --numerical:                    Output line numbers instead of readable text.
 
+   --input-limit <num-sentences>:  Input limit. If input is longer than this, will take a random sample as input.
+
 For questions, please contact olof@mogren.one. I will answer after capacity.
 
 '''
@@ -799,7 +801,7 @@ def summarize_documents(documents, stopwordsFilename=DEFAULT_STOPWORDS, length=D
   return return_string
  
 
-def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=True, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False, min_sentence_length=MIN_SENTENCE_LENGTH):
+def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WORDS, use_tfidf_similarity=True, use_sentiment_similarity=True, use_w2v_similarity=True, split_sentences=True, w2v_vector_file=W2V_VECTOR_FILE, preloaded_w2v_wordmodel=None, w2v_backend=False, w2v_experiments="", quiet=False, output_numbers=False, use_aggregate_for_clustering=False, anaphora_resolution_simple=False, min_sentence_length=MIN_SENTENCE_LENGTH, input_limit=None):
   lines_lists = list()
   num_lines = 0
   for filename in document_names:
@@ -832,27 +834,32 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
         stripped = s.strip()
         if stripped:
           # The following line splits the sentence into a list of words
+          stripped = stripped.replace('\n', ' ')
           wordlist = re.split(REGEX_SPACE, stripped)
           #wordlist = stripped.split()
-          if len(wordlist) > min_sentence_length:
+          if len(wordlist) >= min_sentence_length:
             sentence_count += 1
-            document.append(stripped.replace('\n', ' ').split())
+            document.append(wordlist)
       documents.append(document)
   else:
     for l in lines_lists:
       document = list()
       for s in l:
         stripped = s.strip()
-        if stripped:
-          # The following line splits the sentence into a list of words
-          wordlist = re.split(REGEX_SPACE, stripped)
-          if len(wordlist) <= min_sentence_length:
-            sentence_count += 1
-            document.append(wordlist)
+        # The following line splits the sentence into a list of words
+        wordlist = re.split(REGEX_SPACE, stripped)
+        if len(wordlist) >= min_sentence_length:
+          sentence_count += 1
+          document.append(wordlist)
       documents.append(document)
 
   if not quiet:
     print "Total sentence count after min length filtering and (possibly) splitting: %d"%(sentence_count)
+  if input_limit and sentence_count > input_limit:
+    print "sampling %d sentences to summarize from. (Affecting flag: --input-limit)"%input_limit
+    l = [sentence for document in documents for sentence in document]
+    sample = random.sample(l, 500)
+    documents = [sample]
 
   return summarize_documents(documents, length=length, unit=unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, w2v_vector_file=w2v_vector_file, preloaded_w2v_wordmodel=preloaded_w2v_wordmodel, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple, min_sentence_length=min_sentence_length)
 
@@ -871,8 +878,10 @@ def get_clustering(documents, stopwordsFilename=DEFAULT_STOPWORDS, sentsim_matri
   if sentsim_matrix is None:
     sentsims = get_def_sentsims(documents, stopwordsFilename, None)
     sentsim_matrix = sentsims["tfidf_cosine"]
+  # for outputting clusters:
+  flat_sentences = [sentence for document in documents for sentence in document]
   K = getK(sentsim_matrix.shape[0])
-  clustering = get_clustering_by_similarities(sentsim_matrix, K, "summarization_doc")
+  clustering = get_clustering_by_similarities(sentsim_matrix, K, "summarization_doc")#, debug_sentences=flat_sentences)
   return clustering
 
 
@@ -902,6 +911,8 @@ def main():
 
   anaphora_resolution_simple = False
 
+  input_limit = None
+
   min_sentence_length = MIN_SENTENCE_LENGTH
   
   for i in range(1,len(sys.argv)):
@@ -922,6 +933,9 @@ def main():
       use_sentiment_similarity = False
     elif sys.argv[i] == '--no-w2v':
       use_w2v_similarity = False
+    elif sys.argv[i] == '--input-limit':
+      input_limit = int(sys.argv[i+1])
+      skip = True
     elif sys.argv[i] == '--summary-length':
       summary_length = int(sys.argv[i+1])
       #print "summary-length: %d"%summary_length
@@ -961,6 +975,8 @@ def main():
         summary_length_unit_string = s
 	break
     print "summary_length: %s %s"%(summary_length,summary_length_unit_string)
+    if input_limit:
+      print "If input is longer than %d sentences, will select them randomly."%input_limit
     if sentences_file:
       print "sentences_file: %s"%sentences_file
     elif len(files) > 0:
@@ -973,7 +989,7 @@ def main():
       if not quiet:
         print 'Using default LinTFIDF similarity measure, since no other was provided.'
       use_tfidf_similarity = True
-    summary = summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple, min_sentence_length=min_sentence_length)
+    summary = summarize_files(files, length=summary_length, unit=summary_length_unit, use_tfidf_similarity=use_tfidf_similarity, use_sentiment_similarity=use_sentiment_similarity, use_w2v_similarity=use_w2v_similarity, split_sentences=split_sentences, w2v_vector_file=w2v_vector_file, w2v_backend=w2v_backend, w2v_experiments=w2v_experiments, quiet=quiet, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, anaphora_resolution_simple=anaphora_resolution_simple, min_sentence_length=min_sentence_length, input_limit=input_limit)
     print summary
   else:
     summary = summarize_matrix_files(files, sentences_file, output_numbers=output_numbers, use_aggregate_for_clustering=use_aggregate_for_clustering, quiet=quiet)
