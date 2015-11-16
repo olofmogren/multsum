@@ -166,11 +166,20 @@ def getMultipliedAggregateSimilarities(ms):
 
   aggregateSim = ms[0]
 
+  minval = 1.0
+  maxval = 0.0
+
   for k in range(1,len(ms)):#skip first, it's already added above.
     m = ms[k]
     for i in range(0, m.shape[0]):
       for j in range(0, m.shape[1]):
         aggregateSim[i][j] *= m[i][j]
+        if aggregateSim[i][j] < minval:
+          minval = aggregateSim[i][j]
+        if aggregateSim[i][j] > maxval:
+          maxval = aggregateSim[i][j]
+
+  aggregateSim = (aggregateSim-minval)/(maxval-minval)
 
   return aggregateSim
 
@@ -280,6 +289,8 @@ def get_def_sentsims(documents, stopwordsFilename, idfs):
 
   vocabulary = list(vocabulary_s)
   vocabulary.sort()
+
+  #print vocabulary
 
   vocabularyIndices = dict()
   for i in range(0,len(vocabulary)):
@@ -572,6 +583,8 @@ def get_sentence_embedding_avg(sentence, wordmodel, w2v_backend, quiet=False):
   for w in sentence:
     word = w.lower()
     wordrep = get_word_embedding(word, wordmodel, w2v_backend, quiet=quiet)
+    if wordrep is None:
+      wordrep = get_word_embedding(stem(word), wordmodel, w2v_backend, quiet=quiet)
     if wordrep is not None:
       sentence_embedding += wordrep
       count = count + 1.0
@@ -651,6 +664,8 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
         else:
           tfidf_i = 0.0 #TODO: will this work?
         word_embedding_i = get_word_embedding(word_lc, wordmodel, w2v_backend, quiet=quiet)
+        if word_embedding_i is None:
+          word_embedding_i = get_word_embedding(stem(word_lc), wordmodel, w2v_backend, quiet=quiet)
         #if word_embedding_i is None:
         #  continue
         if "TFIDFWEIGHT" in w2v_experiments:
