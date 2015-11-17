@@ -164,20 +164,22 @@ def getMultipliedAggregateSimilarities(ms):
   if len(ms) == 1:
     return ms[0]
 
-  aggregateSim = ms[0]
-
-  minval = 1.0
-  maxval = 0.0
+  aggregateSim = numpy.array(ms[0], copy=True)
 
   for k in range(1,len(ms)):#skip first, it's already added above.
     m = ms[k]
     for i in range(0, m.shape[0]):
       for j in range(0, m.shape[1]):
         aggregateSim[i][j] *= m[i][j]
-        if aggregateSim[i][j] < minval:
-          minval = aggregateSim[i][j]
-        if aggregateSim[i][j] > maxval:
-          maxval = aggregateSim[i][j]
+
+  minval = 1.0
+  maxval = 0.0
+  for i in range(0, aggregateSim.shape[0]):
+    for j in range(0, aggregateSim.shape[1]):
+      if aggregateSim[i][j] < minval:
+        minval = aggregateSim[i][j]
+      if aggregateSim[i][j] > maxval:
+        maxval = aggregateSim[i][j]
 
   aggregateSim = (aggregateSim-minval)/(maxval-minval)
 
@@ -828,6 +830,7 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
         lines.append(stripped)
     num_lines += len(lines)
     lines_lists.append(lines)
+    f.close()
 
   if not quiet:
     print "Total line count (suppress this with --quiet): %d."%num_lines

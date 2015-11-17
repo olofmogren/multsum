@@ -1,8 +1,92 @@
-import re
+import re, os.path, sys
 
 REGEX_SPACE         = " +"
 
 def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
+  female_names = read_wordlist_file('female_names.txt')
+  male_names = read_wordlist_file('male_names.txt')
+  if anaphora_resolution_simple:
+    documents_to_return = list()
+    try:
+      for document in documents:
+        document_to_return = list()
+        previous_person_male = None
+        previous_person_female = None
+        for sentence in document:
+          new_person_male = None
+          new_person_female = None
+          skip = False
+          for i in range(0, len(sentence)):
+            if skip:
+              skip = False
+              continue
+            word = sentence[i]
+            if word in male_names:
+              new_person_male = word
+              if len(sentence) > i+1 and sentence[i+1].istitle():
+                new_person_male += ' '+sentence[i+1]
+                skip = True
+            if word in female_names:
+              new_person_female = word
+              if len(sentence) > i+1 and sentence[i+1].istitle():
+                new_person_female += ' '+sentence[i+1]
+                skip = True
+          processed_sentence = list()
+          for i in xrange(0, len(sentence)):
+            #if (tags[i] == "PRP" or tags[i] == "PRP$") and words[i] != "it":
+            if is_pronoun_to_replace(sentence[i]):
+              possessive_suffix = ""
+              if is_possessive_pronoun(sentence[i]):
+              #if tags[i][-1] == "$":
+                # English bias:
+                possessive_suffix = "'s"
+              punctuation = ""
+              last_char = sentence[i][-1]
+              word_without_punctuation = sentence[i]
+              if is_punctuation(last_char):
+                punctuation = last_char
+                word_without_punctuation = sentence[i][:-1]
+              if is_male_pronoun(sentence[i]) and (previous_person_male is not None):
+                processed_sentence.append(word_without_punctuation+" ("+previous_person_male+possessive_suffix+")"+punctuation)
+              elif is_male_pronoun(sentence[i]) and (new_person_male is not None):
+                processed_sentence.append(word_without_punctuation+" ("+new_person_male+possessive_suffix+")"+punctuation)
+              elif is_female_pronoun(sentence[i]) and (previous_person_female is not None):
+                processed_sentence.append(word_without_punctuation+" ("+previous_person_female+possessive_suffix+")"+punctuation)
+              elif is_female_pronoun(sentence[i]) and (new_person_female is not None):
+                processed_sentence.append(word_without_punctuation+" ("+new_person_female+possessive_suffix+")"+punctuation)
+              else:
+                # We have found no matchinf name to replace with
+                processed_sentence.append(sentence[i])
+            else:
+              # There is no pronoun to replace
+              processed_sentence.append(sentence[i])
+          if processed_sentence != sentence and not quiet:
+            print "preprocessed: %s"%(' '.join(processed_sentence))
+            #print "original:     %s\npreprocessed: %s"%(sentence, processed_sentence)
+          document_to_return.append(processed_sentence)
+          if new_person_male is not None:
+            previous_person_male = new_person_male
+          if new_person_female is not None:
+            previous_person_female = new_person_female
+        documents_to_return.append(document_to_return)
+    except Exception, e:
+      print e
+      return documents
+    return documents_to_return
+  else:
+    return documents
+
+def read_wordlist_file(filename):
+  wordlist = list()
+  f = open(os.path.abspath(os.path.dirname(sys.argv[0]))+'/'+filename, 'r')
+  for line in f:
+    stripped = line.strip()
+    if stripped:
+      wordlist.append(stripped)
+  f.close()
+  return wordlist
+
+def preprocess_newold(documents, anaphora_resolution_simple=False, quiet=False):
   if anaphora_resolution_simple:
     documents_to_return = list()
     try:
@@ -172,4 +256,15 @@ def is_pronoun_to_replace(word):
   if len(word) > 0 and is_punctuation(word[-1]):
     word = word[:-1]
   return word.lower() in ["he", "his", "she", "her", "s/he", "they", "their", "they're"]#, "it", "its"] 
+  
+def is_male_pronoun(word):
+  if len(word) > 0 and is_punctuation(word[-1]):
+    word = word[:-1]
+  return word.lower() in ["he", "his", "s/he"]
+
+def is_female_pronoun(word):
+  if len(word) > 0 and is_punctuation(word[-1]):
+    word = word[:-1]
+  return word.lower() in ["she", "her", "s/he"]
+  
   
