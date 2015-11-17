@@ -202,12 +202,9 @@ def get_sentences_bags_flat(stopwords, documents):
         # Input is already split. It is now a list of words.
         prev = None
         for w in sentence:
-          if not w.replace("_", ""):
+          w = filter(str.isalnum, w)
+          if not w:
             continue
-          w = w.lower()
-          #if first:
-          #  print w
-
           stemmed = stem(w)
           if prev:
             bigram = prev+" "+stemmed
@@ -550,7 +547,8 @@ def summarize_matrix_files(matrix_files, sentence_file=None, stopwordsFilename=D
   sentences = list()
   for line in f:
     if line:
-      words = re.split(REGEX_SPACE, line)
+      #words = re.split(REGEX_SPACE, line)
+      words = line.split()
       sentences.append(words)
   documents.append(sentences)
 
@@ -586,6 +584,7 @@ def get_sentence_embedding_avg(sentence, wordmodel, w2v_backend, quiet=False):
   count = 0.0
   for w in sentence:
     word = w.lower()
+    word = filter(str.isalnum, word)
     wordrep = get_word_embedding(word, wordmodel, w2v_backend, quiet=quiet)
     if wordrep is None:
       wordrep = get_word_embedding(stem(word), wordmodel, w2v_backend, quiet=quiet)
@@ -659,7 +658,7 @@ def get_w2v_matrix(flat_sentences, wordmodel, w2v_backend, stopwords, documents,
       reps_i = list()
       tfidfs_i = list()
       for word_i in flat_sentences[i]:
-        word_lc = word_i.lower()
+        word_lc = filter(str.isalnum, word_i).lower()
         stem_i = stem(word_lc)
         if stem_i and stem_i in sentences_bags[i] and stem_i in idfs:
           tfidf_i = sentences_bags[i][stem_i]*idfs[stem_i]
@@ -855,7 +854,8 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
         if stripped:
           # The following line splits the sentence into a list of words
           stripped = stripped.replace('\n', ' ')
-          wordlist = re.split(REGEX_SPACE, stripped)
+          #wordlist = re.split(REGEX_SPACE, stripped)
+          wordlist = stripped.split()
           #wordlist = stripped.split()
           if len(wordlist) >= min_sentence_length:
             sentence_count += 1
@@ -867,7 +867,8 @@ def summarize_files(document_names, length=DEFAULT_SUMMARY_LENGTH, unit=UNIT_WOR
       for s in l:
         stripped = s.strip()
         # The following line splits the sentence into a list of words
-        wordlist = re.split(REGEX_SPACE, stripped)
+        #wordlist = re.split(REGEX_SPACE, stripped)
+        wordlist = stripped.split()
         if len(wordlist) >= min_sentence_length:
           sentence_count += 1
           document.append(wordlist)

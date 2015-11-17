@@ -29,6 +29,7 @@ def analyze_sentiment(sentences):
     if len(s) > 0:
       for w in s:
         #"print w
+        w = filter(str.isalnum, w)
         if w.lower() in positive_emotions:
           #print "positive! "+w
           positive_count += 1
