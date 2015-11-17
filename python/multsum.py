@@ -85,10 +85,12 @@ Some of the options below can also be used with the GUI for MULTSUM, multsum_gui
                         Pretrained vectors can be downloaded from http://code.google.com/p/word2vec/ .
                         (This option is available in multsum_gui.py).
      --w2v-backend:     Try to connect to running backend providing word vectors. See w2v_worker.py.
-     --w2v-experiments <experiment-tag>:
+     --w2v-experiments <experiment-tags>:
                         Run experimental versions of the w2v sentence similarity measure.
-                        experiment-tag is one of:
+                        experiment-tags is a comma-separated list (without space) of:
                         TOP5 - using the average of the top 5 scoring word-similarities between the two sentences.
+                       
+                        
 
 2. To use the sentence selection with user specified similarity matrices, run:
 

@@ -65,10 +65,10 @@ def voronoi_iteration(matrix, K, similarity_matrix=True, debug_sentences=None):
   if similarity_matrix:
     similarities = matrix
   else:
-    similarities = numpy.zeros(num_sentences, num_sentences)
+    similarities = numpy.zeros((num_sentences, num_sentences))
     for i in xrange(0, len(num_sentences)):
       for j in xrange(0, len(num_sentences)):
-        similarities[i][j] = 0.5 * (numpy.dot(matrix[i], matrix[j])/numpy.sqrt(numpy.dot(matrix[i], matrix[i]))*numpy.sqrt(numpy.dot(matrix[j], matrix[j]))+1)
+        similarities[i][j] = numpy.dot(matrix[i], matrix[j])/numpy.sqrt(numpy.dot(matrix[i], matrix[i]))*numpy.sqrt(numpy.dot(matrix[j], matrix[j]))
   sentences = range(0,num_sentences)
   candidate_clustering = [0]*num_sentences
   candidate_medoids = [0]*K
