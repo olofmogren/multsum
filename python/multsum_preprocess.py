@@ -46,14 +46,16 @@ def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
               if is_punctuation(last_char):
                 punctuation = last_char
                 word_without_punctuation = sentence[i][:-1]
-              if is_male_pronoun(sentence[i]) and (previous_person_male is not None):
-                processed_sentence.append(word_without_punctuation+" ("+previous_person_male+possessive_suffix+")"+punctuation)
-              elif is_male_pronoun(sentence[i]) and (new_person_male is not None):
+              # First choice: pick name with same gender in same sentence.
+              # Second pick: pick name with same gender from previous sentences
+              if is_male_pronoun(sentence[i]) and (new_person_male is not None):
                 processed_sentence.append(word_without_punctuation+" ("+new_person_male+possessive_suffix+")"+punctuation)
-              elif is_female_pronoun(sentence[i]) and (previous_person_female is not None):
-                processed_sentence.append(word_without_punctuation+" ("+previous_person_female+possessive_suffix+")"+punctuation)
+              elif is_male_pronoun(sentence[i]) and (previous_person_male is not None):
+                processed_sentence.append(word_without_punctuation+" ("+previous_person_male+possessive_suffix+")"+punctuation)
               elif is_female_pronoun(sentence[i]) and (new_person_female is not None):
                 processed_sentence.append(word_without_punctuation+" ("+new_person_female+possessive_suffix+")"+punctuation)
+              elif is_female_pronoun(sentence[i]) and (previous_person_female is not None):
+                processed_sentence.append(word_without_punctuation+" ("+previous_person_female+possessive_suffix+")"+punctuation)
               else:
                 # We have found no matchinf name to replace with
                 processed_sentence.append(sentence[i])
