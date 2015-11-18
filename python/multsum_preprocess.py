@@ -5,6 +5,7 @@ REGEX_SPACE         = " +"
 def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
   female_names = read_wordlist_file('female_names.txt')
   male_names = read_wordlist_file('male_names.txt')
+  print male_names
   if anaphora_resolution_simple:
     documents_to_return = list()
     try:
@@ -22,23 +23,27 @@ def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
               continue
             word = filter(str.isalnum, sentence[i])
             if word in male_names:
-              new_person_male = word
+              print "male name %s"%word
+              new_person_male = [word]
               if len(sentence) > i+1:
                 next_word = filter(str.isalnum, sentence[i+1])
                 if next_word.istitle():
-                  new_person_male += ' '+next_word
+                  new_person_male.append(next_word)
                   skip = True
             if word in female_names:
-              new_person_female = word
+              print "female name %s"%word
+              new_person_female = [word]
               if len(sentence) > i+1:
                 next_word = filter(str.isalnum, sentence[i+1])
                 if next_word.istitle():
-                  new_person_female += ' '+next_word
+                  new_person_female.append(next_word)
                   skip = True
           processed_sentence = list()
           for i in xrange(0, len(sentence)):
+            #print sentence[i]
             #if (tags[i] == "PRP" or tags[i] == "PRP$") and words[i] != "it":
             if is_pronoun_to_replace(sentence[i]):
+              print "is pronoun to replace %s"%sentence[i]
               possessive_suffix = ""
               if is_possessive_pronoun(sentence[i]):
               #if tags[i][-1] == "$":
@@ -53,13 +58,37 @@ def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
               # First choice: pick name with same gender in same sentence.
               # Second pick: pick name with same gender from previous sentences
               if is_male_pronoun(sentence[i]) and (new_person_male is not None):
-                processed_sentence.append(word_without_punctuation+" ("+new_person_male+possessive_suffix+")"+punctuation)
+                print "%s is male pronoun! new person male is not none. %s."%(possessive_suffix, str(previous_person_male))
+                processed_sentence.append(sentence[i]) #this pronoun is already explained in same sentence
+                #processed_sentence.append(word_without_punctuation)
+                #list_to_append = copy.deepcopy(new_person_male)
+                #list_to_append[0] = "("+list_to_append[0]
+                #list_to_append[-1] = list_to_append[-1]+possessive_suffix+")"+punctuation
+                #for term in previous_person_male:
+                #  processed_sentence.append(term)
               elif is_male_pronoun(sentence[i]) and (previous_person_male is not None):
-                processed_sentence.append(word_without_punctuation+" ("+previous_person_male+possessive_suffix+")"+punctuation)
+                print "%s is male pronoun! %s."%(possessive_suffix, str(previous_person_male))
+                processed_sentence.append(word_without_punctuation)
+                list_to_append = copy.deepcopy(previous_person_male)
+                list_to_append[0] = "("+list_to_append[0]
+                list_to_append[-1] = list_to_append[-1]+possessive_suffix+")"+punctuation
+                for term in previous_person_male:
+                  processed_sentence.append(term)
               elif is_female_pronoun(sentence[i]) and (new_person_female is not None):
-                processed_sentence.append(word_without_punctuation+" ("+new_person_female+possessive_suffix+")"+punctuation)
+                processed_sentence.append(sentence[i]) #this pronoun is already explained in same sentence
+                #processed_sentence.append(word_without_punctuation)
+                #list_to_append = copy.deepcopy(new_person_female)
+                #list_to_append[0] = "("+list_to_append[0]
+                #list_to_append[-1] = list_to_append[-1]+possessive_suffix+")"+punctuation
+                #for term in previous_person_male:
+                #  processed_sentence.append(term)
               elif is_female_pronoun(sentence[i]) and (previous_person_female is not None):
-                processed_sentence.append(word_without_punctuation+" ("+previous_person_female+possessive_suffix+")"+punctuation)
+                processed_sentence.append(word_without_punctuation)
+                list_to_append = copy.deepcopy(previous_person_female)
+                list_to_append[0] = "("+list_to_append[0]
+                list_to_append[-1] = list_to_append[-1]+possessive_suffix+")"+punctuation
+                for term in previous_person_male:
+                  processed_sentence.append(term)
               else:
                 # We have found no matchinf name to replace with
                 processed_sentence.append(sentence[i])
