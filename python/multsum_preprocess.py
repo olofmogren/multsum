@@ -20,17 +20,21 @@ def preprocess(documents, anaphora_resolution_simple=False, quiet=False):
             if skip:
               skip = False
               continue
-            word = sentence[i]
+            word = filter(str.isalnum, sentence[i])
             if word in male_names:
               new_person_male = word
-              if len(sentence) > i+1 and sentence[i+1].istitle():
-                new_person_male += ' '+sentence[i+1]
-                skip = True
+              if len(sentence) > i+1:
+                next_word = filter(str.isalnum, sentence[i+1])
+                if next_word.istitle():
+                  new_person_male += ' '+next_word
+                  skip = True
             if word in female_names:
               new_person_female = word
-              if len(sentence) > i+1 and sentence[i+1].istitle():
-                new_person_female += ' '+sentence[i+1]
-                skip = True
+              if len(sentence) > i+1:
+                next_word = filter(str.isalnum, sentence[i+1])
+                if next_word.istitle():
+                  new_person_female += ' '+next_word
+                  skip = True
           processed_sentence = list()
           for i in xrange(0, len(sentence)):
             #if (tags[i] == "PRP" or tags[i] == "PRP$") and words[i] != "it":
