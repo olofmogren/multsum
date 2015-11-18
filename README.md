@@ -59,6 +59,10 @@ Gensim for reading pretrained word2vec vectors (optional):
 
 ### Usage:
 
+Run multsum.py once without arguments to get basic usage info for the current version.
+
+If --spl is specified the input files are assumed to already be split into sentences, one sentence per line. Otherwise, sentence splitting will be performed for you.
+
 #### 1
 
 subsum.py --s sentences-file [--m matrix-file1 [--m matrix-file2 [...]]]
@@ -66,8 +70,6 @@ subsum.py --s sentences-file [--m matrix-file1 [--m matrix-file2 [...]]]
 Will summarize the document in sentences-file, using the sentence similarity matrices in the matrix-files. You can specify an arbitrary number of matrix-files, but in this mode, there has to be one sentences-file.
 
 All input files are plain text files.
-
-The sentence-file has to be split into sentences, one sentence per line.
 
 The matrix-files must contain square matrices of the same dimension as the number of sentences in the sentences-file. Elements are separated by commas, rows separated by semi-colons:
 
@@ -79,8 +81,6 @@ a31, a32, a33;
 #### 2
 
 subsum.py sentences-file1[, sentences-file2[, sentences-file3[, ...]]]
-
-The sentence-files has to be split into sentences, one sentence per line.
 
 The summarizer will use all sentences as input and compute a summary that's representative for all input documents.
 
